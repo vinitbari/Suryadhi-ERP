@@ -1,0 +1,20 @@
+import { Router } from 'express';
+import { operationsController } from './controller';
+import { authenticate } from '../../middleware/auth';
+
+const router = Router();
+
+// Protect all routes
+router.use(authenticate);
+
+// Purchase Orders
+router.get('/purchase-orders', operationsController.getPurchaseOrders);
+router.post('/purchase-orders', operationsController.createPurchaseOrder);
+router.put('/purchase-orders/:id/status', operationsController.updatePurchaseOrderStatus);
+
+// Shortage & Damage Reports
+router.get('/shortage-reports', operationsController.getShortageReports);
+router.post('/shortage-reports', operationsController.createShortageReport);
+router.put('/shortage-reports/:id/resolve', operationsController.resolveShortageReport);
+
+export default router;
