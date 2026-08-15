@@ -2,10 +2,9 @@
   "name": "sems-server",
   "version": "1.0.0",
   "description": "SEMS — Suryadhi Education Management System | Backend API Server",
-  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

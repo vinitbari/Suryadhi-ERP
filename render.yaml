@@ -3,7 +3,7 @@ services:
     name: sems-api
     env: node
     rootDir: server
-    buildCommand: npm install && npm run build && npx prisma generate
+    buildCommand: npm install && npm run build
     startCommand: npm start
     preDeployCommand: npx prisma migrate deploy
     envVars:
