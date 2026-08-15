@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sems-api
+    env: node
+    rootDir: server
+    buildCommand: npm install && npm run build && npx prisma generate
+    startCommand: npm start
+    preDeployCommand: npx prisma migrate deploy
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
