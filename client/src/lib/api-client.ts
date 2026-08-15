@@ -59,9 +59,9 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const storedRefreshToken = localStorage.getItem('refreshToken');
+        const refreshBaseUrl = (apiClient.defaults.baseURL || '/api').replace(/\/$/, '');
         const { data } = await axios.post(
-          '/api/auth/refresh', 
+          `${refreshBaseUrl}/auth/refresh`, 
           { refreshToken: storedRefreshToken || undefined }, 
           { withCredentials: true }
         );
