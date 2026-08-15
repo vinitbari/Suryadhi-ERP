@@ -5,8 +5,15 @@
  */
 import axios from 'axios';
 
+const getBaseUrl = (): string => {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+  if (!envUrl) return '/api';
+  const cleanUrl = envUrl.replace(/\/+$/, '');
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+};
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseUrl(),
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -59,6 +66,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const storedRefreshToken = localStorage.getItem('refreshToken');
         const refreshBaseUrl = (apiClient.defaults.baseURL || '/api').replace(/\/$/, '');
         const { data } = await axios.post(
           `${refreshBaseUrl}/auth/refresh`, 
