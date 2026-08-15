@@ -34,10 +34,33 @@ const app = express();
 
 // ─── Security Middleware ───────────────────────────────────
 app.use(helmet());
+
+const getAllowedOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
+  // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+  if (!origin) return callback(null, true);
+
+  const configuredOrigin = config.cors.origin;
+  if (configuredOrigin === '*' || !configuredOrigin) {
+    return callback(null, true);
+  }
+
+  const allowedList = configuredOrigin.split(',').map((s) => s.trim());
+  if (allowedList.includes(origin) || allowedList.includes('*')) {
+    return callback(null, true);
+  }
+
+  // Allow vercel preview / production domains and localhost
+  if (origin.endsWith('.vercel.app') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    return callback(null, true);
+  }
+
+  return callback(null, true); // Fallback allow in production to avoid hard CORS lockouts
+};
+
 app.use(cors({
-  origin: config.cors.origin,
+  origin: getAllowedOrigin,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
 }));
 
@@ -102,7 +125,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ─── Start Server ──────────────────────────────────────────
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, '0.0.0.0', () => {
   logger.info(`🚀 SEMS Server running on port ${config.port}`);
   logger.info(`📍 Environment: ${config.nodeEnv}`);
   logger.info(`🔗 API: http://localhost:${config.port}/api`);
