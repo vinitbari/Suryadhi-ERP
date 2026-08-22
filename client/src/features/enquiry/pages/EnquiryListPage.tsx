@@ -109,8 +109,8 @@ const columns: ColumnDef<EnquiryData>[] = [
 const dummySummaryCards: ProgramCount[] = [
   { title: 'Play Group', count: 14 },
   { title: 'Nursery', count: 46 },
-  { title: 'Euro Junior', count: 14 },
-  { title: 'Euro Senior', count: 4 },
+  { title: 'SUNOIA Junior', count: 14 },
+  { title: 'SUNOIA Senior', count: 4 },
 ];
 
 export default function EnquiryListPage() {
@@ -127,26 +127,30 @@ export default function EnquiryListPage() {
           api.get('/reports/enquiry-count'),
         ]);
 
-        if (enquiriesRes.data.success && enquiriesRes.data.data && enquiriesRes.data.data.length > 0) {
+        if (enquiriesRes.data.success && Array.isArray(enquiriesRes.data.data)) {
           const apiData = enquiriesRes.data.data.map((item: any) => ({
             id: item.id,
-            studentName: `${item.student?.firstName || ''} ${item.student?.lastName || ''}`.trim(),
+            studentName: `${item.student?.firstName || ''} ${item.student?.lastName || ''}`.trim() || 'Prospective Student',
             enquirerName: item.enquirerName || 'N/A',
             enquirerContact: item.enquirerMobile || 'N/A',
             stage: item.stage || 'NEW',
             subStage: 'Admission Enquiry (New Opportunity)',
-            nextFollowUp: '',
-            lastContacted: new Date(item.createdAt).toLocaleDateString()
+            nextFollowUp: item.nextFollowUp ? new Date(item.nextFollowUp).toLocaleDateString() : '',
+            lastContacted: item.lastContacted ? new Date(item.lastContacted).toLocaleDateString() : new Date(item.createdAt).toLocaleDateString()
           }));
           setData(apiData);
         }
 
-        if (countsRes.data.success && countsRes.data.data && countsRes.data.data.length > 0) {
-          const countsData = countsRes.data.data.map((c: any) => ({
-            title: c.program.name,
-            count: c.count
-          }));
-          setSummaryCards(countsData);
+        if (countsRes.data.success && Array.isArray(countsRes.data.data)) {
+          const countsData = countsRes.data.data
+            .filter((c: any) => !c.program?.name?.toLowerCase().includes('euro'))
+            .map((c: any) => ({
+              title: c.program.name,
+              count: c.count
+            }));
+          if (countsData.length > 0) {
+            setSummaryCards(countsData);
+          }
         }
       } catch (error) {
         console.warn('Failed to fetch enquiries data, falling back to dummy data', error);

@@ -17,4 +17,8 @@ router.get('/shortage-reports', operationsController.getShortageReports);
 router.post('/shortage-reports', operationsController.createShortageReport);
 router.put('/shortage-reports/:id/resolve', operationsController.resolveShortageReport);
 
+// Exchange Orders
+router.get('/exchanges', operationsController.getExchangeOrders);
+router.post('/exchanges', operationsController.createExchangeOrder);
+
 export default router;

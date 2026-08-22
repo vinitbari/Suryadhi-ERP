@@ -19,7 +19,7 @@ export class FranchiseeController {
   async getRoyaltyForecast(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = getEffectiveSchoolId(req);
-      const result = await franchiseeService.getRoyaltyForecast(schoolId);
+      const result = await franchiseeService.getRoyaltyForecast(schoolId, req.query as any);
       res.json({
         success: true,
         data: result,

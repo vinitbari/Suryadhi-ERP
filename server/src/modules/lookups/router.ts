@@ -23,6 +23,11 @@ router.get('/schools', async (_req, res, next) => {
 router.get('/programs', async (_req, res, next) => {
   try {
     const programs = await prisma.program.findMany({
+      where: {
+        NOT: {
+          name: { contains: 'Euro', mode: 'insensitive' }
+        }
+      },
       orderBy: { sortOrder: 'asc' },
       select: { id: true, name: true, shortName: true },
     });
@@ -161,14 +166,77 @@ router.get('/media-sources', async (_req, res, next) => {
 router.get('/batches', async (req, res, next) => {
   try {
     const { programId, schoolId } = req.query;
+    
+    // Find matching school or default school
+    const effectiveSchoolId = (schoolId as string) || req.user?.schoolId || (await prisma.school.findFirst({ select: { id: true } }))?.id;
+
+    if (programId && effectiveSchoolId) {
+      // Ensure Early Morning Shift and Late Morning Shift exist for this program
+      const existing = await prisma.batch.findMany({
+        where: { programId: programId as string, schoolId: effectiveSchoolId },
+      });
+
+      const hasEarly = existing.some(b => b.timeSlot?.toLowerCase().includes('early'));
+      const hasLate = existing.some(b => b.timeSlot?.toLowerCase().includes('late'));
+
+      if (!hasEarly) {
+        await prisma.batch.create({
+          data: {
+            programId: programId as string,
+            schoolId: effectiveSchoolId,
+            timeSlot: 'Early Morning Shift',
+            capacity: 25,
+          },
+        }).catch(() => {});
+      }
+
+      if (!hasLate) {
+        await prisma.batch.create({
+          data: {
+            programId: programId as string,
+            schoolId: effectiveSchoolId,
+            timeSlot: 'Late Morning Shift',
+            capacity: 25,
+          },
+        }).catch(() => {});
+      }
+    }
+
     const batches = await prisma.batch.findMany({
       where: {
         ...(programId && { programId: programId as string }),
-        ...(schoolId && { schoolId: schoolId as string }),
+        ...(effectiveSchoolId && { schoolId: effectiveSchoolId }),
       },
       select: { id: true, timeSlot: true, capacity: true, program: { select: { name: true } } },
+      orderBy: { timeSlot: 'asc' },
     });
-    res.json({ success: true, data: batches });
+
+    // Normalize any legacy timeSlot labels to Early Morning Shift / Late Morning Shift only
+    const formatted = batches.map(b => {
+      let slot = b.timeSlot;
+      if (!slot.includes('Shift')) {
+        slot = slot.toLowerCase().includes('late') || slot.toLowerCase().includes('afternoon') || slot.toLowerCase().includes('11') || slot.toLowerCase().includes('12') 
+          ? 'Late Morning Shift' 
+          : 'Early Morning Shift';
+      }
+      return {
+        ...b,
+        timeSlot: slot,
+      };
+    });
+
+    // If still empty, return standard static shifts with dummy IDs for selector fallback
+    if (formatted.length === 0) {
+      return res.json({
+        success: true,
+        data: [
+          { id: 'batch-early', timeSlot: 'Early Morning Shift', capacity: 25 },
+          { id: 'batch-late', timeSlot: 'Late Morning Shift', capacity: 25 },
+        ],
+      });
+    }
+
+    res.json({ success: true, data: formatted });
   } catch (error) { next(error); }
 });
 

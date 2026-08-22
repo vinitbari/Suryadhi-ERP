@@ -63,7 +63,7 @@ export default function InventoryDetailsPage() {
         const res = await api.get('/admissions', { params: { limit: 50 } });
         if (res.data.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
           const mapped: InventoryStudent[] = res.data.data.map((item: any, idx: number) => ({
-            uin: item.uin || item.student?.uin || `EK/3201/${String(idx + 1).padStart(4, '0')}/2627`,
+            uin: item.uin || item.student?.uin || `SK/3201/${String(idx + 1).padStart(4, '0')}/2627`,
             name: `${item.studentFirstName || item.student?.firstName || ''} ${item.studentLastName || item.student?.lastName || ''}`.trim() || 'Student',
             program: item.program?.name || 'Nursery',
             status: idx % 3 === 0 ? 'D Model PO Adjustment is pending' : 'Adjusted against the D Model Inventory'

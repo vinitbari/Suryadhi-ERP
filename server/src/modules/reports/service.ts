@@ -153,7 +153,29 @@ export class ReportsService {
   async getAdmissionCount(schoolId: string, filters: any) {
     const { academicYearId } = filters;
     const yearFilter: any = academicYearId ? { academicYearId } : {};
-    const programs = await prisma.program.findMany({ orderBy: { sortOrder: 'asc' } });
+    // Automatically migrate any legacy Euro programs if found
+    const hasEuro = await prisma.program.findFirst({
+      where: {
+        OR: [
+          { name: { contains: 'Euro', mode: 'insensitive' } },
+          { name: 'Euro Junior' },
+          { name: 'Euro Senior' },
+        ],
+      },
+    });
+    if (hasEuro) {
+      const { migrateLegacyEuroPrograms } = await import('../../utils/cleanup-programs');
+      await migrateLegacyEuroPrograms(prisma);
+    }
+
+    const programs = await prisma.program.findMany({
+      where: {
+        NOT: {
+          name: { contains: 'Euro', mode: 'insensitive' }
+        }
+      },
+      orderBy: { sortOrder: 'asc' }
+    });
 
     const data = await Promise.all(
       programs.map(async (program) => {
@@ -173,7 +195,30 @@ export class ReportsService {
   async getEnquiryCount(schoolId: string, filters: any) {
     const { academicYearId } = filters;
     const yearFilter: any = academicYearId ? { academicYearId } : {};
-    const programs = await prisma.program.findMany({ orderBy: { sortOrder: 'asc' } });
+    
+    // Automatically migrate any legacy Euro programs if found
+    const hasEuro = await prisma.program.findFirst({
+      where: {
+        OR: [
+          { name: { contains: 'Euro', mode: 'insensitive' } },
+          { name: 'Euro Junior' },
+          { name: 'Euro Senior' },
+        ],
+      },
+    });
+    if (hasEuro) {
+      const { migrateLegacyEuroPrograms } = await import('../../utils/cleanup-programs');
+      await migrateLegacyEuroPrograms(prisma);
+    }
+
+    const programs = await prisma.program.findMany({
+      where: {
+        NOT: {
+          name: { contains: 'Euro', mode: 'insensitive' }
+        }
+      },
+      orderBy: { sortOrder: 'asc' }
+    });
 
     const data = await Promise.all(
       programs.map(async (program) => {

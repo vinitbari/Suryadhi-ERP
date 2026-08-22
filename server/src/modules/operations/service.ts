@@ -1,24 +1,31 @@
-import { PrismaClient, OrderStatus } from '@prisma/client';
+import prisma from '../../config/database';
+import { OrderStatus } from '@prisma/client';
 import { 
   CreatePurchaseOrderInput, 
   UpdatePurchaseOrderStatusInput, 
   ReportShortageDamageInput 
 } from './schema';
 
-const prisma = new PrismaClient();
-
 export class OperationsService {
-  async getPurchaseOrders(schoolId: string) {
+  private async getFallbackSchoolId(schoolId?: string): Promise<string> {
+    if (schoolId) return schoolId;
+    const school = await prisma.school.findFirst({ select: { id: true } });
+    return school?.id || '';
+  }
+
+  async getPurchaseOrders(schoolId?: string) {
+    const where: any = schoolId ? { schoolId } : {};
     return prisma.purchaseOrder.findMany({
-      where: { schoolId },
+      where,
       orderBy: { createdAt: 'desc' }
     });
   }
 
-  async createPurchaseOrder(schoolId: string, data: CreatePurchaseOrderInput) {
+  async createPurchaseOrder(schoolId: string | undefined, data: CreatePurchaseOrderInput) {
+    const effectiveSchoolId = await this.getFallbackSchoolId(schoolId);
     return prisma.purchaseOrder.create({
       data: {
-        schoolId,
+        schoolId: effectiveSchoolId,
         orderNumber: data.orderNumber,
         items: data.items,
         totalAmount: data.totalAmount,
@@ -28,7 +35,7 @@ export class OperationsService {
     });
   }
 
-  async updatePurchaseOrderStatus(id: string, schoolId: string, data: UpdatePurchaseOrderStatusInput) {
+  async updatePurchaseOrderStatus(id: string, _schoolId: string | undefined, data: UpdatePurchaseOrderStatusInput) {
     return prisma.purchaseOrder.update({
       where: { id },
       data: { 
@@ -39,17 +46,19 @@ export class OperationsService {
     });
   }
 
-  async getShortageReports(schoolId: string) {
+  async getShortageReports(schoolId?: string) {
+    const where: any = schoolId ? { schoolId } : {};
     return prisma.shortageReport.findMany({
-      where: { schoolId },
+      where,
       orderBy: { reportDate: 'desc' }
     });
   }
 
-  async createShortageReport(schoolId: string, data: ReportShortageDamageInput) {
+  async createShortageReport(schoolId: string | undefined, data: ReportShortageDamageInput) {
+    const effectiveSchoolId = await this.getFallbackSchoolId(schoolId);
     return prisma.shortageReport.create({
       data: {
-        schoolId,
+        schoolId: effectiveSchoolId,
         itemName: data.itemName,
         quantity: data.quantity,
         reportType: data.reportType,
@@ -60,12 +69,48 @@ export class OperationsService {
     });
   }
 
-  async resolveShortageReport(id: string, schoolId: string) {
+  async resolveShortageReport(id: string, _schoolId?: string) {
     return prisma.shortageReport.update({
       where: { id },
       data: {
         status: 'RESOLVED',
         resolvedAt: new Date(),
+      }
+    });
+  }
+
+  async getExchangeOrders(schoolId?: string) {
+    const where: any = { reportType: 'EXCHANGE' };
+    if (schoolId) where.schoolId = schoolId;
+
+    const reports = await prisma.shortageReport.findMany({
+      where,
+      orderBy: { reportDate: 'desc' }
+    });
+
+    return reports.map(r => ({
+      id: r.id,
+      exchangeNumber: `EXC-${r.id.slice(-6).toUpperCase()}`,
+      poNumber: r.description?.includes('PO:') ? r.description.split('PO:')[1].split(';')[0].trim() : 'PO-2026-001',
+      lrNumber: `LR-${Math.floor(100000 + Math.random() * 900000)}`,
+      reportDate: r.reportDate.toISOString().split('T')[0],
+      itemName: r.itemName,
+      quantity: r.quantity,
+      status: r.status,
+    }));
+  }
+
+  async createExchangeOrder(schoolId: string | undefined, data: any) {
+    const effectiveSchoolId = await this.getFallbackSchoolId(schoolId);
+    return prisma.shortageReport.create({
+      data: {
+        schoolId: effectiveSchoolId,
+        itemName: data.itemName || 'Student Kit Exchange',
+        quantity: Number(data.quantity) || 1,
+        reportType: 'EXCHANGE',
+        description: `PO: ${data.poNumber || 'N/A'}; Reason: ${data.reason || 'Size/Item Mismatch'}`,
+        reportDate: new Date(),
+        status: 'REPORTED',
       }
     });
   }

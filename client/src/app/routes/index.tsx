@@ -82,6 +82,7 @@ const GenericListPage = lazy(() => import('@/features/shared/pages/GenericListPa
 const ManageAcademicYearsPage = lazy(() => import('@/features/shared/pages/ManageAcademicYearsPage'));
 const OnlinePaymentReportPage = lazy(() => import('@/features/reports/pages/OnlinePaymentReportPage'));
 const StudentForecastedRoyaltyReportPage = lazy(() => import('@/features/reports/pages/StudentForecastedRoyaltyReportPage'));
+const AdmissionCountReportPage = lazy(() => import('@/features/reports/pages/AdmissionCountReportPage'));
 
 const PageLoader = () => (
   <div className="flex h-[50vh] items-center justify-center">
@@ -180,7 +181,7 @@ export default function AppRoutes() {
           <Route path={PATHS.REPORTS.CANCELLED_RECEIPTS} element={<GenericListPage title="Cancelled Receipts" description="Audit log of all voided financial receipts" apiEndpoint="/reports/cancelled-receipts" />} />
           <Route path={PATHS.REPORTS.TRANSFERS} element={<GenericListPage title="Transferred Student Report" description="Log of all incoming and outgoing student transfers" apiEndpoint="/reports/transfers" />} />
           <Route path={PATHS.REPORTS.FCR} element={<GenericListPage title="FCR Report" description="Fee Collection Report analytics" apiEndpoint="/reports/fcr" />} />
-          <Route path={PATHS.REPORTS.ADMISSION_COUNT} element={<GenericListPage title="Admission Count Analytics" description="High-level aggregations of admissions data" apiEndpoint="/reports/admission-count" />} />
+          <Route path={PATHS.REPORTS.ADMISSION_COUNT} element={<AdmissionCountReportPage />} />
           <Route path={PATHS.REPORTS.ONLINE_PAYMENTS} element={<OnlinePaymentReportPage />} />
           <Route path={PATHS.REPORTS.ROYALTY_FORECAST} element={<StudentForecastedRoyaltyReportPage />} />
 

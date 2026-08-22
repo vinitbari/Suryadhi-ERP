@@ -124,11 +124,16 @@ app.use('/api/support', supportRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+import { migrateLegacyEuroPrograms } from './utils/cleanup-programs';
+
 // ─── Start Server ──────────────────────────────────────────
-const server = app.listen(config.port, '0.0.0.0', () => {
+const server = app.listen(config.port, '0.0.0.0', async () => {
   logger.info(`🚀 SEMS Server running on port ${config.port}`);
   logger.info(`📍 Environment: ${config.nodeEnv}`);
   logger.info(`🔗 API: http://localhost:${config.port}/api`);
+
+  // Run legacy programs migration/cleanup
+  await migrateLegacyEuroPrograms(prisma);
 });
 
 // ─── Graceful Shutdown ─────────────────────────────────────

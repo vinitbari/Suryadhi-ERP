@@ -17,6 +17,9 @@ router.get('/trigger-seed', async (_req, res) => {
     });
 
     // ── Programs ───────────────────────────────────────────────
+    const { migrateLegacyEuroPrograms } = await import('./utils/cleanup-programs');
+    await migrateLegacyEuroPrograms(prisma);
+
     const programs = await Promise.all([
       prisma.program.upsert({ where: { name: 'Play Group' }, update: {}, create: { name: 'Play Group', shortName: 'PG', ageFrom: 18, ageTo: 30, sortOrder: 1 } }),
       prisma.program.upsert({ where: { name: 'Nursery' }, update: {}, create: { name: 'Nursery', shortName: 'NR', ageFrom: 30, ageTo: 42, sortOrder: 2 } }),
@@ -97,7 +100,7 @@ router.get('/trigger-seed', async (_req, res) => {
     }
 
     // ── Users ──────────────────────────────────────────────────
-    const passwordHash = await bcrypt.hash('Euro@7474', 12);
+    const passwordHash = await bcrypt.hash('Suryadhi@7474', 12);
     await prisma.user.upsert({
       where: { username: 'Rahul.Khandale' },
       update: { passwordHash, schoolId: school.id },

@@ -31,7 +31,7 @@ const dummyAdmissions: AdmissionRecord[] = [
   { id: '2', admissionDate: '01-04-2026', uin: 'SLPL3201/0002/2027', name: 'Aarohi Santosh Sonare', fatherName: 'Santosh Sonare', program: 'SUNOIA Junior', batchTime: 'Early Morning Shift', mobile1: '9370005720', mobile2: '9325944111', type: 'OFFLINE' },
   { id: '3', admissionDate: '01-04-2026', uin: 'SLPL3201/0014/2027', name: 'Dnyanda Nandkishor Bawane', fatherName: 'Nandkishor Bawane', program: 'SUNOIA Junior', batchTime: 'Early Morning Shift', mobile1: '9552407021', mobile2: '9145460195', type: 'OFFLINE' },
   { id: '4', admissionDate: '01-04-2026', uin: 'SLPL3201/0023/2027', name: 'Alfaz Baig Mirza', fatherName: 'Furhan Baig Mirza', program: 'SUNOIA Junior', batchTime: 'Early Morning Shift', mobile1: '7721024102', mobile2: '7400051112', type: 'OFFLINE' },
-  { id: '5', admissionDate: '01-04-2026', uin: 'SLPL3201/0035/2027', name: 'Ananya Rahul Sharma', fatherName: 'Rahul Sharma', program: 'Nursery', batchTime: 'Regular Shift', mobile1: '9822114455', mobile2: '9822114456', type: 'ONLINE' },
+  { id: '5', admissionDate: '01-04-2026', uin: 'SLPL3201/0035/2027', name: 'Ananya Rahul Sharma', fatherName: 'Rahul Sharma', program: 'Nursery', batchTime: 'Late Morning Shift', mobile1: '9822114455', mobile2: '9822114456', type: 'ONLINE' },
   { id: '6', admissionDate: '01-04-2026', uin: 'SLPL3201/0068/2027', name: 'Rudransh Vaibhav Deshmukh', fatherName: 'Vaibhav Deshmukh', program: 'SUNOIA Senior', batchTime: 'Early Morning Shift', mobile1: '9673966580', mobile2: '8208466635', type: 'OFFLINE' },
 ];
 
@@ -77,7 +77,7 @@ export default function AdmissionListPage() {
           api.get('/reports/admission-count'),
         ]);
 
-        if (admissionsRes.data.success && admissionsRes.data.data?.length > 0) {
+        if (admissionsRes.data.success && Array.isArray(admissionsRes.data.data)) {
           setData(admissionsRes.data.data.map((item: any) => ({
             id: item.id,
             admissionDate: new Date(item.admissionDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
@@ -92,13 +92,18 @@ export default function AdmissionListPage() {
           })));
         }
 
-        if (countsRes.data.success && countsRes.data.data?.length > 0) {
-          setProgramCounts(countsRes.data.data.map((item: any) => ({
-            name: item.program.name,
-            shortName: item.program.shortName,
-            count: item.active,
-            color: PROGRAM_COLORS[item.program.shortName] || '#999',
-          })));
+        if (countsRes.data.success && Array.isArray(countsRes.data.data)) {
+          const validCounts = countsRes.data.data
+            .filter((item: any) => !item.program?.name?.toLowerCase().includes('euro'))
+            .map((item: any) => ({
+              name: item.program.name,
+              shortName: item.program.shortName,
+              count: item.active,
+              color: PROGRAM_COLORS[item.program.shortName] || '#999',
+            }));
+          if (validCounts.length > 0) {
+            setProgramCounts(validCounts);
+          }
         }
       } catch (error) {
         console.warn('Falling back to dummy data', error);

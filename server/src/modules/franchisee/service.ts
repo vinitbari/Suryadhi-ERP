@@ -35,10 +35,25 @@ export class FranchiseeService {
     };
   }
 
-  async getRoyaltyForecast(schoolId?: string) {
+  async getRoyaltyForecast(schoolId?: string, query?: { admissionId?: string; search?: string }) {
     const where: any = {};
     if (schoolId) {
       where.admission = { schoolId };
+    }
+    if (query?.admissionId) {
+      where.admissionId = query.admissionId;
+    }
+    if (query?.search) {
+      where.admission = {
+        ...where.admission,
+        student: {
+          OR: [
+            { firstName: { contains: query.search, mode: 'insensitive' } },
+            { lastName: { contains: query.search, mode: 'insensitive' } },
+            { uin: { contains: query.search, mode: 'insensitive' } },
+          ]
+        }
+      };
     }
 
     const forecasts = await prisma.forecastedRoyalty.findMany({
