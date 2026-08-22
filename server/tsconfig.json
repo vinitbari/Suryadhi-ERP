@@ -13,10 +13,10 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
+    "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"],
-      "@prisma/*": ["prisma/*"]
+      "@/*": ["./src/*"],
+      "@prisma/*": ["./prisma/*"]
     }
   },
   "include": ["src/**/*"],
