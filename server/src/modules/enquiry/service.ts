@@ -6,6 +6,7 @@ import {
   UpdateEnquiryInput,
   EnquiryFollowUpInput,
   EnquiryListQuery,
+  EnquiryReceiptInput,
 } from './schema';
 
 export class EnquiryService {
@@ -299,6 +300,57 @@ export class EnquiryService {
       entity: 'Enquiry',
       entityId: id,
     });
+  }
+
+  /**
+   * Get advance receipts for an enquiry
+   */
+  async getReceipts(enquiryId: string, schoolId: string) {
+    await this.getById(enquiryId, schoolId);
+
+    const receipts = await prisma.advanceReceipt.findMany({
+      where: { enquiryId },
+      orderBy: { receiptDate: 'desc' },
+    });
+
+    return receipts;
+  }
+
+  /**
+   * Add advance receipt to an enquiry
+   */
+  async addReceipt(enquiryId: string, schoolId: string, input: EnquiryReceiptInput, userId: string) {
+    await this.getById(enquiryId, schoolId);
+
+    const count = await prisma.advanceReceipt.count({
+      where: { enquiry: { schoolId } },
+    });
+    const schoolCode = schoolId.slice(-4).toUpperCase();
+    const receiptNumber = `SK/${schoolCode}/REC/${String(count + 1).padStart(4, '0')}`;
+
+    const receipt = await prisma.advanceReceipt.create({
+      data: {
+        enquiryId,
+        amount: input.amount,
+        paymentMode: input.paymentMode as any,
+        receiptNumber,
+        receiptDate: input.receiptDate ? new Date(input.receiptDate) : new Date(),
+        bankName: input.bankName || null,
+        chequeNumber: input.chequeNumber || null,
+        chequeDate: input.chequeDate ? new Date(input.chequeDate) : null,
+        notes: input.notes || null,
+      },
+    });
+
+    await createAuditLog({
+      userId,
+      action: 'CREATE',
+      entity: 'AdvanceReceipt',
+      entityId: receipt.id,
+      newValue: receipt,
+    });
+
+    return receipt;
   }
 }
 

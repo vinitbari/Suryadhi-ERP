@@ -88,9 +88,26 @@ export class FeeService {
   }
 
   /**
-   * Get receipts for an admission
+   * Get receipts for an admission (or all receipts for school if no admissionId provided)
    */
-  async getReceipts(admissionId: string, schoolId: string) {
+  async getReceipts(admissionId: string | undefined, schoolId: string) {
+    if (!admissionId) {
+      const receipts = await prisma.receipt.findMany({
+        where: { admission: { schoolId }, deletedAt: null },
+        include: {
+          admission: {
+            select: {
+              id: true,
+              student: { select: { firstName: true, lastName: true } },
+              program: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { receiptDate: 'desc' },
+      });
+      return receipts;
+    }
+
     const whereAdmission: any = { id: admissionId, deletedAt: null };
     if (schoolId) {
       whereAdmission.schoolId = schoolId;

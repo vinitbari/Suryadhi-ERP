@@ -45,3 +45,16 @@ export type CreateEnquiryInput = z.infer<typeof createEnquirySchema>;
 export type UpdateEnquiryInput = z.infer<typeof updateEnquirySchema>;
 export type EnquiryFollowUpInput = z.infer<typeof enquiryFollowUpSchema>;
 export type EnquiryListQuery = z.infer<typeof enquiryListQuerySchema>;
+
+export const enquiryReceiptSchema = z.object({
+  amount: z.number().positive('Amount must be greater than 0'),
+  paymentMode: z.enum(['CASH', 'CHEQUE', 'ONLINE']),
+  receiptDate: z.string().optional(),
+  bankName: z.string().optional(),
+  chequeNumber: z.string().optional(),
+  chequeDate: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export type EnquiryReceiptInput = z.infer<typeof enquiryReceiptSchema>;
+
