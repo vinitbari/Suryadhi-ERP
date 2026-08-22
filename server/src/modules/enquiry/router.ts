@@ -6,6 +6,7 @@ import {
   updateEnquirySchema,
   enquiryFollowUpSchema,
   enquiryListQuerySchema,
+  enquiryReceiptSchema,
 } from './schema';
 
 const router = Router();
@@ -23,6 +24,17 @@ router.get(
 
 // GET /api/enquiries/:id
 router.get('/:id', (req, res, next) => enquiryController.getById(req, res, next));
+
+// GET /api/enquiries/:id/receipts
+router.get('/:id/receipts', (req, res, next) => enquiryController.getReceipts(req, res, next));
+
+// POST /api/enquiries/:id/receipts
+router.post(
+  '/:id/receipts',
+  authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'),
+  validate(enquiryReceiptSchema),
+  (req, res, next) => enquiryController.addReceipt(req, res, next)
+);
 
 // POST /api/enquiries
 router.post(
@@ -43,6 +55,14 @@ router.put(
 // POST /api/enquiries/:id/follow-up
 router.post(
   '/:id/follow-up',
+  authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'),
+  validate(enquiryFollowUpSchema),
+  (req, res, next) => enquiryController.addFollowUp(req, res, next)
+);
+
+// POST /api/enquiries/:id/follow-ups (alias)
+router.post(
+  '/:id/follow-ups',
   authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'),
   validate(enquiryFollowUpSchema),
   (req, res, next) => enquiryController.addFollowUp(req, res, next)

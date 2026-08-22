@@ -80,6 +80,31 @@ export class EnquiryController {
       next(error);
     }
   }
+
+  async getReceipts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const receipts = await enquiryService.getReceipts(req.params.id as string, schoolId);
+      res.json({ success: true, data: receipts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addReceipt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const receipt = await enquiryService.addReceipt(
+        req.params.id as string,
+        schoolId,
+        req.body,
+        req.user!.userId
+      );
+      res.status(201).json({ success: true, data: receipt });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const enquiryController = new EnquiryController();
