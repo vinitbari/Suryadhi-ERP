@@ -128,6 +128,7 @@ export class FeeService {
             totalAmount: true,
             netAmount: true,
             createdAt: true,
+
           },
         },
       },
