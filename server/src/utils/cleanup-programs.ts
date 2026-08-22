@@ -140,3 +140,57 @@ export async function migrateLegacyEuroPrograms(prisma: PrismaClient) {
     logger.warn(error, 'Legacy program cleanup encountered an error');
   }
 }
+
+export async function ensureDefaultUsers(prisma: PrismaClient) {
+  try {
+    const bcrypt = await import('bcryptjs');
+    let school = await prisma.school.findFirst();
+    if (!school) {
+      school = await prisma.school.create({
+        data: {
+          code: 'SEMS-DEMO-001',
+          name: 'SŪNOIAKIDS™ Demo Pre-School',
+          city: 'Pune',
+          state: 'Maharashtra',
+          country: 'India',
+        },
+      });
+    }
+
+    const adminHash = await bcrypt.hash('Admin@123', 12);
+    await prisma.user.upsert({
+      where: { username: 'admin' },
+      update: { passwordHash: adminHash, schoolId: school.id, isActive: true, deletedAt: null },
+      create: {
+        username: 'admin',
+        email: 'admin@sems.suryadhi.in',
+        passwordHash: adminHash,
+        firstName: 'System',
+        lastName: 'Admin',
+        role: 'SUPER_ADMIN',
+        schoolId: school.id,
+        isActive: true,
+      },
+    });
+
+    const rahulHash = await bcrypt.hash('Suryadhi@7474', 12);
+    await prisma.user.upsert({
+      where: { username: 'Rahul.Khandale' },
+      update: { passwordHash: rahulHash, schoolId: school.id, isActive: true, deletedAt: null },
+      create: {
+        username: 'Rahul.Khandale',
+        email: 'rahul.khandale@sems.suryadhi.in',
+        passwordHash: rahulHash,
+        firstName: 'Rahul',
+        lastName: 'Khandale',
+        role: 'SUPER_ADMIN',
+        schoolId: school.id,
+        isActive: true,
+      },
+    });
+
+    logger.info('✅ Default administrators verified (admin & Rahul.Khandale)');
+  } catch (error) {
+    logger.warn(error, 'Failed to ensure default administrators');
+  }
+}
