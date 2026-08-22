@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, Search, Plus, Loader2, Printer, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Loader2, Printer, CheckCircle2, ArrowLeft } from 'lucide-react';
 import api from '@/api/client';
 import { showToast } from '@/lib/toast';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -12,7 +12,7 @@ import { downloadAsPDF } from '@/lib/downloadUtils';
 export default function AdvanceReceiptFormPage() {
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const queryAdmissionId = searchParams.get('admissionId');
   const targetId = paramId || queryAdmissionId || '';
 
@@ -28,18 +28,43 @@ export default function AdvanceReceiptFormPage() {
     if (!admId) return;
     setIsLoading(true);
     try {
-      const [admRes, receiptsRes] = await Promise.all([
-        api.get(`/admissions/${admId}`),
-        api.get(`/fees/receipts?admissionId=${admId}`).catch(() => ({ data: { success: false, data: [] } })),
-      ]);
+      let dataFound: any = null;
+      let realAdmissionId = admId;
 
-      if (admRes.data.success && admRes.data.data) {
-        setAdmissionData(admRes.data.data);
+      // Try direct API fetch
+      try {
+        const admRes = await api.get(`/admissions/${admId}`);
+        if (admRes.data.success && admRes.data.data) {
+          dataFound = admRes.data.data;
+          realAdmissionId = dataFound.id;
+        }
+      } catch (err) {
+        // Fallback: If admId is numeric (e.g. '2'), lookup from admissions list
+        const listRes = await api.get('/admissions?limit=50&status=ACTIVE').catch(() => ({ data: { success: false, data: [] } }));
+        if (listRes.data.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+          setAdmissionList(listRes.data.data);
+          const idx = parseInt(admId, 10) - 1;
+          const matched = (idx >= 0 && idx < listRes.data.data.length) ? listRes.data.data[idx] : listRes.data.data[0];
+          if (matched) {
+            dataFound = matched;
+            realAdmissionId = matched.id;
+          }
+        }
       }
-      if (receiptsRes.data.success && Array.isArray(receiptsRes.data.data)) {
-        setReceipts(receiptsRes.data.data);
-      } else if (admRes.data.data?.receipts) {
-        setReceipts(admRes.data.data.receipts);
+
+      if (dataFound) {
+        setAdmissionData(dataFound);
+        setCurrentAdmissionId(realAdmissionId);
+
+        // Fetch receipts for this admission
+        const receiptsRes = await api.get(`/fees/receipts?admissionId=${realAdmissionId}`).catch(() => ({ data: { success: false, data: [] } }));
+        if (receiptsRes.data.success && Array.isArray(receiptsRes.data.data)) {
+          setReceipts(receiptsRes.data.data);
+        } else if (Array.isArray(dataFound.receipts)) {
+          setReceipts(dataFound.receipts);
+        } else {
+          setReceipts([]);
+        }
       }
     } catch (err) {
       console.warn('Failed to load admission receipt details', err);
@@ -56,7 +81,7 @@ export default function AdvanceReceiptFormPage() {
     }
   }, [targetId]);
 
-  // 2. Fetch available admissions if no specific target ID is given or for switcher
+  // 2. Fetch available admissions list for switcher
   useEffect(() => {
     const fetchAdmissions = async () => {
       try {
@@ -82,21 +107,23 @@ export default function AdvanceReceiptFormPage() {
   const invoices = admissionData?.invoices || [];
   const primaryInvoice = invoices[0] || {};
 
-  const term1Amount = Number(primaryInvoice.term1Amount || 20250);
-  const term2Amount = Number(primaryInvoice.term2Amount || 9200);
+  const term1Amount = Number(primaryInvoice.term1Amount || 0);
+  const term2Amount = Number(primaryInvoice.term2Amount || 0);
   const totalAmount = Number(primaryInvoice.netAmount || primaryInvoice.totalAmount || (term1Amount + term2Amount));
   const amountReceived = receipts.reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const balanceAmount = Math.max(0, totalAmount - amountReceived);
 
-  const studentName = `${student?.firstName || 'Mahi'} ${student?.middleName || ''} ${student?.lastName || 'Rathod'}`.replace(/\s+/g, ' ').trim();
+  const studentName = student 
+    ? `${student.firstName || ''} ${student.middleName || ''} ${student.lastName || ''}`.replace(/\s+/g, ' ').trim() 
+    : (isLoading ? 'Loading...' : '-');
   
   // Format UIN & Invoice Number with SK prefix
-  const rawUin = student?.uin || 'SK/3201/0052/2027';
-  const uin = rawUin.replace(/^EK\//i, 'SK/');
-  const programName = program?.name || 'SUNOIA Senior';
+  const rawUin = student?.uin || '';
+  const uin = rawUin ? rawUin.replace(/^EK\//i, 'SK/') : (isLoading ? 'Loading...' : '-');
+  const programName = program?.name || (isLoading ? 'Loading...' : '-');
   
-  const rawInvoiceNo = primaryInvoice.invoiceNumber || `SK/3201/${(student?.uin || '0052').replace(/[^0-9]/g, '').slice(-4) || '0052'}/2027`;
-  const invoiceNumber = rawInvoiceNo.replace(/^EK\//i, 'SK/');
+  const rawInvoiceNo = primaryInvoice.invoiceNumber || (student?.uin ? `SK/3201/${student.uin.replace(/[^0-9]/g, '').slice(-4) || '0001'}/2027` : '');
+  const invoiceNumber = rawInvoiceNo ? rawInvoiceNo.replace(/^EK\//i, 'SK/') : (isLoading ? 'Loading...' : '-');
 
   return (
     <div className="max-w-[1400px] mx-auto pb-12 pt-2 space-y-4">
@@ -118,7 +145,7 @@ export default function AdvanceReceiptFormPage() {
               <SelectContent>
                 {admissionList.map((a) => (
                   <SelectItem key={a.id} value={a.id} className="text-xs">
-                    {a.student?.firstName} {a.student?.lastName} ({a.program?.name})
+                    {a.student?.firstName} {a.student?.lastName} ({a.program?.name || 'Program'})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -152,10 +179,10 @@ export default function AdvanceReceiptFormPage() {
           onBack={() => setActiveTab('main')}
           studentName={studentName}
           uin={uin}
-          fatherName={parent?.fatherName || 'Sachin Chavhan'}
-          motherName={parent?.motherName || 'Swati Sachin Rathod'}
-          fatherMobile={parent?.fatherMobile || '7721038204'}
-          motherMobile={parent?.motherMobile || '7721038088'}
+          fatherName={parent?.fatherName || '-'}
+          motherName={parent?.motherName || '-'}
+          fatherMobile={parent?.fatherMobile || '-'}
+          motherMobile={parent?.motherMobile || '-'}
           totalAmount={totalAmount}
           amountReceived={amountReceived}
           balanceAmount={balanceAmount}
@@ -207,20 +234,20 @@ function MainView({
   const [posAmt, setPosAmt] = useState('');
 
   const handleGenerateLink = () => {
-    if (!onlineAmt || isNaN(Number(onlineAmt))) {
+    if (!onlineAmt || isNaN(Number(onlineAmt)) || Number(onlineAmt) <= 0) {
       showToast('Please enter a valid online payment amount', 'error');
       return;
     }
-    showToast(`Online payment gateway link generated for ₹${onlineAmt}`, 'success');
+    showToast(`Online payment gateway link generated for ₹${Number(onlineAmt).toLocaleString('en-IN')}`, 'success');
     setOnlineAmt('');
   };
 
   const handlePosPayment = () => {
-    if (!posAmt || isNaN(Number(posAmt))) {
+    if (!posAmt || isNaN(Number(posAmt)) || Number(posAmt) <= 0) {
       showToast('Please enter a valid POS amount', 'error');
       return;
     }
-    showToast(`Payment request of ₹${posAmt} pushed to POS machine`, 'success');
+    showToast(`Payment request of ₹${Number(posAmt).toLocaleString('en-IN')} pushed to POS machine`, 'success');
     setPosAmt('');
   };
 
@@ -475,14 +502,21 @@ function PaymentStatusView({
 function NewReceiptView({ onBack, admissionId, studentName, programName, balanceAmount }: any) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    amount: balanceAmount > 0 ? String(balanceAmount) : '10000',
+    amount: balanceAmount > 0 ? String(balanceAmount) : '',
     paymentMode: 'CASH',
     bankName: '',
     bankBranch: '',
     chequeNumber: '',
     chequeDate: '',
+    transactionId: '',
     remarks: 'Fee payment receipt',
   });
+
+  useEffect(() => {
+    if (balanceAmount > 0) {
+      setFormData((prev) => ({ ...prev, amount: String(balanceAmount) }));
+    }
+  }, [balanceAmount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -490,16 +524,23 @@ function NewReceiptView({ onBack, admissionId, studentName, programName, balance
       showToast('No admission ID found. Please select an admission first.', 'error');
       return;
     }
+    const amt = Number(formData.amount);
+    if (!amt || amt <= 0) {
+      showToast('Please enter a valid receipt amount', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await api.post('/fees/receipts', {
         admissionId,
-        amount: Number(formData.amount),
+        amount: amt,
         paymentMode: formData.paymentMode,
         bankName: formData.bankName || undefined,
         bankBranch: formData.bankBranch || undefined,
-        chequeNumber: formData.chequeNumber || undefined,
-        chequeDate: formData.chequeDate || undefined,
+        chequeNumber: formData.paymentMode === 'CHEQUE' ? formData.chequeNumber : undefined,
+        chequeDate: formData.paymentMode === 'CHEQUE' ? formData.chequeDate : undefined,
+        transactionId: (formData.paymentMode === 'ONLINE' || formData.paymentMode === 'BANK_TRANSFER') ? formData.transactionId : undefined,
       });
 
       if (res.data.success) {
@@ -515,35 +556,40 @@ function NewReceiptView({ onBack, admissionId, studentName, programName, balance
 
   return (
     <div className="bg-white border border-slate-300 shadow-sm rounded-sm p-4">
-      <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm flex items-center">
+      <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm flex items-center justify-between">
         <span className="font-semibold text-[13px] text-slate-700">≡ Add Advance / Fee Receipt</span>
+        {balanceAmount > 0 && (
+          <span className="text-xs text-rose-700 font-semibold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+            Outstanding: ₹{Number(balanceAmount).toLocaleString('en-IN')}
+          </span>
+        )}
       </div>
       
       <form onSubmit={handleSubmit} className="border border-slate-300 p-6 space-y-4">
-        <div className="grid grid-cols-2 gap-4 pb-2 border-b border-slate-200">
+        <div className="grid grid-cols-2 gap-4 pb-3 border-b border-slate-200">
           <div>
-            <span className="text-xs text-slate-500">Student:</span>
-            <p className="font-semibold text-slate-800 text-sm">{studentName}</p>
+            <span className="text-xs text-slate-500 font-medium">Student Name:</span>
+            <p className="font-bold text-slate-900 text-sm">{studentName || 'Student'}</p>
           </div>
           <div>
-            <span className="text-xs text-slate-500">Program:</span>
-            <p className="text-slate-800 text-sm">{programName}</p>
+            <span className="text-xs text-slate-500 font-medium">Program:</span>
+            <p className="text-blue-700 font-semibold text-sm">{programName || 'Program'}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">Amount (₹) *</label>
+            <label className="text-xs font-semibold text-slate-700">Amount (₹) *</label>
             <Input 
               type="number"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               required
-              className="h-8 text-sm bg-white"
+              className="h-8 text-sm bg-white font-mono font-bold"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">Payment Mode *</label>
+            <label className="text-xs font-semibold text-slate-700">Payment Mode *</label>
             <Select 
               value={formData.paymentMode} 
               onValueChange={(val) => setFormData({ ...formData, paymentMode: val })}
@@ -562,13 +608,13 @@ function NewReceiptView({ onBack, admissionId, studentName, programName, balance
         </div>
 
         {formData.paymentMode === 'CHEQUE' && (
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-700">Bank Name</label>
               <Input 
                 value={formData.bankName}
                 onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                placeholder="e.g. HDFC Bank"
+                placeholder="e.g. HDFC Bank, SBI"
                 className="h-8 text-sm bg-white"
               />
             </div>
@@ -578,6 +624,29 @@ function NewReceiptView({ onBack, admissionId, studentName, programName, balance
                 value={formData.chequeNumber}
                 onChange={(e) => setFormData({ ...formData, chequeNumber: e.target.value })}
                 placeholder="6-digit cheque number"
+                className="h-8 text-sm bg-white font-mono"
+              />
+            </div>
+          </div>
+        )}
+
+        {(formData.paymentMode === 'ONLINE' || formData.paymentMode === 'BANK_TRANSFER') && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Transaction Reference / UTR</label>
+              <Input 
+                value={formData.transactionId}
+                onChange={(e) => setFormData({ ...formData, transactionId: e.target.value })}
+                placeholder="e.g. UPI/123456789/REF"
+                className="h-8 text-sm bg-white font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Bank / Payment App</label>
+              <Input 
+                value={formData.bankName}
+                onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                placeholder="e.g. Google Pay, Razorpay"
                 className="h-8 text-sm bg-white"
               />
             </div>
@@ -585,11 +654,11 @@ function NewReceiptView({ onBack, admissionId, studentName, programName, balance
         )}
 
         <div className="flex gap-2 pt-4 border-t border-slate-200">
-          <Button type="button" onClick={onBack} variant="outline" size="sm" className="h-8">
+          <Button type="button" onClick={onBack} variant="outline" size="sm" className="h-8 text-xs font-semibold">
             Cancel
           </Button>
-          <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+          <Button type="submit" size="sm" className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 text-xs font-semibold" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
             Save & Generate Receipt
           </Button>
         </div>
@@ -606,7 +675,7 @@ function OtherReceiptView({ onBack, admissionId, studentName, programName }: any
       admissionId={admissionId} 
       studentName={studentName} 
       programName={programName} 
-      balanceAmount={5000} 
+      balanceAmount={0} 
     />
   );
 }

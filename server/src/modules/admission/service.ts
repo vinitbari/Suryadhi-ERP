@@ -135,6 +135,38 @@ export class AdmissionService {
     }
 
     if (!admission) {
+      // Check if id is an integer index (e.g. "2" -> 2nd admission) or matches UIN
+      if (/^\d+$/.test(id)) {
+        const num = parseInt(id, 10);
+        const skipCount = Math.max(0, num - 1);
+        admission = await prisma.admission.findFirst({
+          where: { deletedAt: null },
+          skip: skipCount,
+          orderBy: { admissionDate: 'desc' },
+          include: {
+            student: {
+              include: { parent: true },
+            },
+            program: true,
+            batch: true,
+            academicYear: true,
+            discountType: true,
+            invoices: { 
+              include: { receipts: true },
+              orderBy: { createdAt: 'desc' } 
+            },
+            receipts: { orderBy: { receiptDate: 'desc' } },
+            graduations: { orderBy: { graduationDate: 'desc' } },
+            quitRecord: true,
+            transferOutRequest: true,
+            forecastedRoyalties: { orderBy: { month: 'asc' } },
+            school: { select: { name: true, code: true } },
+          },
+        });
+      }
+    }
+
+    if (!admission) {
       throw new AppError('Admission not found', 404);
     }
 
