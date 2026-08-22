@@ -105,7 +105,12 @@ export default function ProgramChangePage() {
             <div className="flex items-center">
               <label className="w-[35%] text-[13px] text-[#333] text-right pr-4">Student Name</label>
               <div className="w-[65%]">
-                <Input type="text" value={studentData ? `${studentData.studentFirstName} ${studentData.studentLastName}` : ''} disabled className="h-8 rounded-sm border-[#ccc] bg-[#eee] text-[13px] w-full" />
+                <Input 
+                  type="text" 
+                  value={studentData ? (studentData.student ? `${studentData.student.firstName || ''} ${studentData.student.lastName || ''}`.trim() : `${studentData.studentFirstName || ''} ${studentData.studentLastName || ''}`.trim()) : ''} 
+                  disabled 
+                  className="h-8 rounded-sm border-[#ccc] bg-[#eee] text-[13px] w-full" 
+                />
               </div>
             </div>
 

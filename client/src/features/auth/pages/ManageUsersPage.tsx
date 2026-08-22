@@ -82,7 +82,7 @@ export default function ManageUsersPage() {
   const fetchSchools = async () => {
     try {
       const res = await authApi.getSchoolsLookup();
-      if (res.data.success && res.data.data.length > 0) {
+      if (res.data.success && Array.isArray(res.data.data)) {
         setSchools(res.data.data);
       }
     } catch (err) {

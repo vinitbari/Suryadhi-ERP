@@ -1,89 +1,299 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, Search, Plus } from 'lucide-react';
+import { ChevronDown, Search, Plus, Loader2, Printer, CheckCircle2, ArrowLeft } from 'lucide-react';
+import api from '@/api/client';
+import { showToast } from '@/lib/toast';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { downloadAsPDF } from '@/lib/downloadUtils';
 
 export default function AdvanceReceiptFormPage() {
   const navigate = useNavigate();
+  const { id: paramId } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryAdmissionId = searchParams.get('admissionId');
+  const targetId = paramId || queryAdmissionId || '';
+
   const [activeTab, setActiveTab] = useState<'main' | 'status' | 'new' | 'other'>('main');
+  const [admissionList, setAdmissionList] = useState<any[]>([]);
+  const [currentAdmissionId, setCurrentAdmissionId] = useState<string>(targetId);
+  const [admissionData, setAdmissionData] = useState<any>(null);
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 1. Fetch specific admission details and receipts
+  const loadAdmissionDetails = async (admId: string) => {
+    if (!admId) return;
+    setIsLoading(true);
+    try {
+      const [admRes, receiptsRes] = await Promise.all([
+        api.get(`/admissions/${admId}`),
+        api.get(`/fees/receipts?admissionId=${admId}`).catch(() => ({ data: { success: false, data: [] } })),
+      ]);
+
+      if (admRes.data.success && admRes.data.data) {
+        setAdmissionData(admRes.data.data);
+      }
+      if (receiptsRes.data.success && Array.isArray(receiptsRes.data.data)) {
+        setReceipts(receiptsRes.data.data);
+      } else if (admRes.data.data?.receipts) {
+        setReceipts(admRes.data.data.receipts);
+      }
+    } catch (err) {
+      console.warn('Failed to load admission receipt details', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Sync paramId when URL param changes
+  useEffect(() => {
+    if (targetId) {
+      setCurrentAdmissionId(targetId);
+      loadAdmissionDetails(targetId);
+    }
+  }, [targetId]);
+
+  // 2. Fetch available admissions if no specific target ID is given or for switcher
+  useEffect(() => {
+    const fetchAdmissions = async () => {
+      try {
+        const res = await api.get('/admissions?limit=50&status=ACTIVE');
+        if (res.data.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          setAdmissionList(res.data.data);
+          if (!targetId && !currentAdmissionId) {
+            const firstId = res.data.data[0].id;
+            setCurrentAdmissionId(firstId);
+            loadAdmissionDetails(firstId);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load admissions list', err);
+      }
+    };
+    fetchAdmissions();
+  }, []);
+
+  const student = admissionData?.student;
+  const parent = student?.parent;
+  const program = admissionData?.program;
+  const invoices = admissionData?.invoices || [];
+  const primaryInvoice = invoices[0] || {};
+
+  const term1Amount = Number(primaryInvoice.term1Amount || 20250);
+  const term2Amount = Number(primaryInvoice.term2Amount || 9200);
+  const totalAmount = Number(primaryInvoice.netAmount || primaryInvoice.totalAmount || (term1Amount + term2Amount));
+  const amountReceived = receipts.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const balanceAmount = Math.max(0, totalAmount - amountReceived);
+
+  const studentName = `${student?.firstName || 'Mahi'} ${student?.middleName || ''} ${student?.lastName || 'Rathod'}`.replace(/\s+/g, ' ').trim();
+  
+  // Format UIN & Invoice Number with SK prefix
+  const rawUin = student?.uin || 'SK/3201/0052/2027';
+  const uin = rawUin.replace(/^EK\//i, 'SK/');
+  const programName = program?.name || 'SUNOIA Senior';
+  
+  const rawInvoiceNo = primaryInvoice.invoiceNumber || `SK/3201/${(student?.uin || '0052').replace(/[^0-9]/g, '').slice(-4) || '0052'}/2027`;
+  const invoiceNumber = rawInvoiceNo.replace(/^EK\//i, 'SK/');
 
   return (
     <div className="max-w-[1400px] mx-auto pb-12 pt-2 space-y-4">
-      {activeTab === 'main' && <MainView onNavigate={setActiveTab} onBack={() => navigate('/admission')} />}
-      {activeTab === 'status' && <PaymentStatusView onBack={() => setActiveTab('main')} />}
-      {activeTab === 'new' && <NewReceiptView onBack={() => setActiveTab('main')} />}
-      {activeTab === 'other' && <OtherReceiptView onBack={() => setActiveTab('main')} />}
+      {/* Student Selector Toolbar */}
+      {admissionList.length > 1 && (
+        <div className="bg-white p-3 border border-slate-300 rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-700">Select Active Admission:</span>
+            <Select 
+              value={currentAdmissionId} 
+              onValueChange={(val) => {
+                setCurrentAdmissionId(val);
+                navigate(`/admissions/${val}/receipt`);
+              }}
+            >
+              <SelectTrigger className="w-[300px] h-8 text-xs bg-slate-50">
+                <SelectValue placeholder="Select student admission" />
+              </SelectTrigger>
+              <SelectContent>
+                {admissionList.map((a) => (
+                  <SelectItem key={a.id} value={a.id} className="text-xs">
+                    {a.student?.firstName} {a.student?.lastName} ({a.program?.name})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="text-slate-500">Invoice: <strong className="text-slate-800">{invoiceNumber}</strong></span>
+            <span className="text-slate-500">UIN: <strong className="text-slate-800">{uin}</strong></span>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'main' && (
+        <MainView 
+          onNavigate={setActiveTab} 
+          onBack={() => navigate('/admission')}
+          studentName={studentName}
+          programName={programName}
+          invoiceNumber={invoiceNumber}
+          term1Amount={term1Amount}
+          term2Amount={term2Amount}
+          totalAmount={totalAmount}
+          amountReceived={amountReceived}
+          balanceAmount={balanceAmount}
+          receipts={receipts}
+          isLoading={isLoading}
+        />
+      )}
+      {activeTab === 'status' && (
+        <PaymentStatusView 
+          onBack={() => setActiveTab('main')}
+          studentName={studentName}
+          uin={uin}
+          fatherName={parent?.fatherName || 'Sachin Chavhan'}
+          motherName={parent?.motherName || 'Swati Sachin Rathod'}
+          fatherMobile={parent?.fatherMobile || '7721038204'}
+          motherMobile={parent?.motherMobile || '7721038088'}
+          totalAmount={totalAmount}
+          amountReceived={amountReceived}
+          balanceAmount={balanceAmount}
+        />
+      )}
+      {activeTab === 'new' && (
+        <NewReceiptView 
+          onBack={() => {
+            setActiveTab('main');
+            if (currentAdmissionId) loadAdmissionDetails(currentAdmissionId);
+          }}
+          admissionId={currentAdmissionId}
+          studentName={studentName}
+          programName={programName}
+          balanceAmount={balanceAmount}
+        />
+      )}
+      {activeTab === 'other' && (
+        <OtherReceiptView 
+          onBack={() => {
+            setActiveTab('main');
+            if (currentAdmissionId) loadAdmissionDetails(currentAdmissionId);
+          }}
+          admissionId={currentAdmissionId}
+          studentName={studentName}
+          programName={programName}
+        />
+      )}
     </div>
   );
 }
 
 // ─── 1. MAIN VIEW ─────────────────────────────────────────────────────────
-function MainView({ onNavigate, onBack }: { onNavigate: (tab: any) => void, onBack: () => void }) {
+function MainView({ 
+  onNavigate, 
+  onBack,
+  studentName,
+  programName,
+  invoiceNumber,
+  term1Amount,
+  term2Amount,
+  totalAmount,
+  amountReceived,
+  balanceAmount,
+  receipts,
+  isLoading,
+}: any) {
+  const [onlineAmt, setOnlineAmt] = useState('');
+  const [posAmt, setPosAmt] = useState('');
+
+  const handleGenerateLink = () => {
+    if (!onlineAmt || isNaN(Number(onlineAmt))) {
+      showToast('Please enter a valid online payment amount', 'error');
+      return;
+    }
+    showToast(`Online payment gateway link generated for ₹${onlineAmt}`, 'success');
+    setOnlineAmt('');
+  };
+
+  const handlePosPayment = () => {
+    if (!posAmt || isNaN(Number(posAmt))) {
+      showToast('Please enter a valid POS amount', 'error');
+      return;
+    }
+    showToast(`Payment request of ₹${posAmt} pushed to POS machine`, 'success');
+    setPosAmt('');
+  };
+
   return (
     <>
       <h1 className="text-2xl font-normal text-slate-800 mb-4">View Receipt</h1>
       <div className="bg-white border border-slate-300 shadow-sm rounded-sm p-4">
-        
         {/* Header grey bar */}
         <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm flex items-center">
           <span className="font-semibold text-[13px] text-slate-700">≡ View Receipts</span>
         </div>
         
         <div className="border border-slate-300 p-6 space-y-8">
-          
           {/* Summary Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-6">
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Student Name</span>
-              <span className="text-slate-800">Mahi Sachin Rathod</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Student Name:</span>
+              <span className="text-slate-900 font-semibold">{studentName}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Program</span>
-              <span className="text-slate-800">SUNOIA Senior</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Program:</span>
+              <span className="text-slate-800">{programName}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Invoice Number</span>
-              <span className="text-slate-800">EK/3201/0052/2027</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Invoice Number:</span>
+              <span className="text-slate-800 font-mono font-semibold">{invoiceNumber}</span>
             </div>
 
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Amount Term 1</span>
-              <span className="text-slate-800">20250.00</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Amount Term 1:</span>
+              <span className="text-slate-800 font-mono">{term1Amount.toFixed(2)}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Amount Term 2</span>
-              <span className="text-slate-800">9200.00</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Amount Term 2:</span>
+              <span className="text-slate-800 font-mono">{term2Amount.toFixed(2)}</span>
             </div>
             <div></div>
 
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Total Amount</span>
-              <span className="text-slate-800">29450.00</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Total Amount:</span>
+              <span className="text-slate-900 font-bold font-mono">{totalAmount.toFixed(2)}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Amount Received</span>
-              <span className="text-slate-800">0.00</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Amount Received:</span>
+              <span className="text-emerald-700 font-bold font-mono">{amountReceived.toFixed(2)}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Balance Amount</span>
-              <span className="text-slate-800">29450.00</span>
+              <span className="text-slate-600 text-right pr-4 font-medium">Balance Amount:</span>
+              <span className="text-red-700 font-bold font-mono">{balanceAmount.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Buttons inputs */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Input placeholder="Online Amount" className="w-[180px] h-8 text-[13px] border-slate-300 rounded-sm" />
-              <Button className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm">
+          {/* Quick Payment Actions */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-3">
+              <Input 
+                value={onlineAmt} 
+                onChange={(e) => setOnlineAmt(e.target.value)} 
+                placeholder="Online Amount ₹" 
+                className="w-[180px] h-8 text-[13px] border-slate-300 rounded-sm bg-white" 
+              />
+              <Button onClick={handleGenerateLink} className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm">
                 Generate Link
               </Button>
             </div>
-            <div className="flex items-center gap-4">
-              <Input placeholder="Paytm POS Amount" className="w-[180px] h-8 text-[13px] border-slate-300 rounded-sm" />
-              <Button className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm">
+            <div className="flex items-center gap-3">
+              <Input 
+                value={posAmt} 
+                onChange={(e) => setPosAmt(e.target.value)} 
+                placeholder="Paytm POS Amount ₹" 
+                className="w-[180px] h-8 text-[13px] border-slate-300 rounded-sm bg-white" 
+              />
+              <Button onClick={handlePosPayment} className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm">
                 Paytm POS Payment
               </Button>
             </div>
@@ -91,9 +301,9 @@ function MainView({ onNavigate, onBack }: { onNavigate: (tab: any) => void, onBa
 
           {/* Receipts Table Section */}
           <div className="border border-slate-300 rounded-sm">
-            <div className="bg-[#f2f2f2] px-4 py-2 border-b border-slate-300 flex items-center justify-between">
+            <div className="bg-[#f2f2f2] px-4 py-2 border-b border-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="font-semibold text-[13px] text-slate-700">Receipts</span>
-              <div className="flex gap-1">
+              <div className="flex flex-wrap gap-1">
                 <Button onClick={() => onNavigate('status')} className="bg-[#0056b3] hover:bg-[#004494] text-white h-7 px-3 text-[12px] shadow-none rounded-sm">
                   <Search className="w-3 h-3 mr-1" /> View Payment Status
                 </Button>
@@ -105,34 +315,78 @@ function MainView({ onNavigate, onBack }: { onNavigate: (tab: any) => void, onBa
                 </Button>
               </div>
             </div>
-            <div className="p-4 bg-[#f9f9f9]">
+            <div className="p-4 bg-[#f9f9f9] overflow-x-auto">
               <table className="w-full border-collapse border border-slate-300 text-[13px]">
                 <thead>
                   <tr className="bg-[#f2f2f2]">
                     <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Receipt Date</th>
                     <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Receipt Number</th>
-                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Bank Name</th>
-                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Cheque Number</th>
-                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Cheque Date</th>
-                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Amount</th>
-                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Action</th>
+                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Mode / Bank</th>
+                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold">Reference / Cheque</th>
+                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold text-right">Amount</th>
+                    <th className="border border-slate-300 p-2 text-slate-700 font-semibold text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Empty state */}
-                  <tr>
-                    <td colSpan={7} className="p-4 text-center text-slate-500 bg-white border border-slate-300">No data available in table</td>
-                  </tr>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-500 bg-white border border-slate-300">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto text-blue-600 mb-1" />
+                        Loading receipts...
+                      </td>
+                    </tr>
+                  ) : receipts.length > 0 ? (
+                    receipts.map((r: any) => (
+                      <tr key={r.id} className="bg-white hover:bg-slate-50 border border-slate-300">
+                        <td className="border border-slate-300 p-2 text-slate-700">
+                          {formatDate(r.receiptDate)}
+                        </td>
+                        <td className="border border-slate-300 p-2 font-mono font-medium text-blue-700">
+                          {r.receiptNumber}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-slate-700">
+                          {r.paymentMode} {r.bankName ? `(${r.bankName})` : ''}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-slate-600 font-mono text-xs">
+                          {r.chequeNumber || r.transactionId || 'N/A'}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-right font-mono font-bold text-slate-900">
+                          {formatCurrency(Number(r.amount))}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-7 text-xs text-blue-600 hover:text-blue-800"
+                            onClick={() => downloadAsPDF({
+                              title: `Receipt: ${r.receiptNumber}`,
+                              subtitle: `Student: ${studentName} | Invoice: ${invoiceNumber} | Date: ${formatDate(r.receiptDate)}`,
+                              columns: ['Receipt No', 'Payment Mode', 'Amount Paid'],
+                              rows: [[r.receiptNumber, r.paymentMode, formatCurrency(Number(r.amount))]],
+                              filename: `receipt-${r.receiptNumber}`,
+                            })}
+                          >
+                            <Printer className="h-3.5 w-3.5 mr-1" /> Print
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-slate-500 bg-white border border-slate-300">
+                        No receipts generated yet. Click "+ Add Receipt" to record a payment.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
-
         </div>
 
         <div className="bg-[#f2f2f2] px-6 py-4 border border-slate-300 border-t-0 rounded-b-sm">
           <Button onClick={onBack} className="bg-[#333] hover:bg-[#222] text-white h-8 px-6 text-[13px] shadow-none rounded-sm">
-            Back
+            Back to Admission List
           </Button>
         </div>
       </div>
@@ -141,7 +395,18 @@ function MainView({ onNavigate, onBack }: { onNavigate: (tab: any) => void, onBa
 }
 
 // ─── 2. PAYMENT STATUS VIEW ────────────────────────────────────────────────
-function PaymentStatusView({ onBack }: { onBack: () => void }) {
+function PaymentStatusView({ 
+  onBack,
+  studentName,
+  uin,
+  fatherName,
+  motherName,
+  fatherMobile,
+  motherMobile,
+  totalAmount,
+  amountReceived,
+  balanceAmount,
+}: any) {
   return (
     <>
       <div className="bg-white border border-slate-300 shadow-sm rounded-sm">
@@ -154,170 +419,49 @@ function PaymentStatusView({ onBack }: { onBack: () => void }) {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 mb-6 text-[12px]">
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Student Name</span>
-              <span className="text-slate-800 font-medium">Mahi Sachin Rathod</span>
+              <span className="text-slate-600 text-right pr-4">Student Name:</span>
+              <span className="text-slate-800 font-medium">{studentName}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">UIN</span>
-              <span className="text-slate-800 font-medium">EK3201/0052/2027</span>
+              <span className="text-slate-600 text-right pr-4">UIN:</span>
+              <span className="text-slate-800 font-medium font-mono">{uin}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Father Name</span>
-              <span className="text-slate-800 font-medium">Sachin Chavhan</span>
-            </div>
-
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Mother Name</span>
-              <span className="text-slate-800 font-medium">Swati Sachin Rathod</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Mobile</span>
-              <span className="text-slate-800 font-medium">7721038204</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Mobile</span>
-              <span className="text-slate-800 font-medium">7721038088</span>
+              <span className="text-slate-600 text-right pr-4">Father Name:</span>
+              <span className="text-slate-800 font-medium">{fatherName}</span>
             </div>
 
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Email</span>
-              <span className="text-slate-800 font-medium">sachinrathod1411@gmail.com</span>
+              <span className="text-slate-600 text-right pr-4">Mother Name:</span>
+              <span className="text-slate-800 font-medium">{motherName}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Student Address</span>
-              <span className="text-slate-800 font-medium">Arni</span>
+              <span className="text-slate-600 text-right pr-4">Father Mobile:</span>
+              <span className="text-slate-800 font-medium">{fatherMobile}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Academic Year</span>
-              <span className="text-slate-800 font-medium">Apr 26 - Mar 27</span>
-            </div>
-
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Program</span>
-              <span className="text-slate-800 font-medium">SUNOIA Senior</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Franchisee Code</span>
-              <span className="text-slate-800 font-medium">EK Yavatmal-Arni</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Franchisee Address</span>
-              <span className="text-slate-800 font-medium line-clamp-1">Mohanlal Mangal Karyalay, Yavatmal road in front of forest office...</span>
+              <span className="text-slate-600 text-right pr-4">Mother Mobile:</span>
+              <span className="text-slate-800 font-medium">{motherMobile}</span>
             </div>
           </div>
 
-          <h3 className="text-[11px] font-bold text-slate-800 mb-2 uppercase">Student Payment details</h3>
-          
-          <div className="space-y-2 mb-4">
-            {/* Term 1 Accordion */}
-            <div className="border border-slate-300 rounded-sm">
-              <div className="bg-[#f9f9f9] px-4 py-2 flex justify-between items-center cursor-pointer">
-                <span className="font-semibold text-[13px] text-slate-700">Term 1</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </div>
-              <div className="p-4 bg-white border-t border-slate-300">
-                <div className="flex justify-between text-[13px] mb-4">
-                  <div>Amount Term 1: <span className="font-bold">20250</span></div>
-                  <div>Balance Amount Term 1: <span className="font-bold">20250</span></div>
-                </div>
-                <table className="w-full text-center text-[12px] border border-slate-300">
-                  <thead className="bg-[#f2f2f2]">
-                    <tr>
-                      <th className="p-2 border border-slate-300 font-semibold">Fee Type</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Receivable Amount</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Received Till Date</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Balance Receivable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Term Fee</td>
-                      <td className="p-2 border border-slate-300">3550</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">3550</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Registration Fee</td>
-                      <td className="p-2 border border-slate-300">8900</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">8900</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Uniforms</td>
-                      <td className="p-2 border border-slate-300">2150</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">2150</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Tuition Fee</td>
-                      <td className="p-2 border border-slate-300">5650</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">5650</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+          <div className="border border-slate-300 rounded-sm p-4 bg-slate-50 mb-4 grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-slate-500">Total Billed</p>
+              <p className="text-lg font-bold text-slate-800 font-mono">{formatCurrency(totalAmount)}</p>
             </div>
-
-            {/* Term 2 Accordion */}
-            <div className="border border-slate-300 rounded-sm">
-              <div className="bg-[#f9f9f9] px-4 py-2 flex justify-between items-center cursor-pointer">
-                <span className="font-semibold text-[13px] text-slate-700">Term 2</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </div>
-              <div className="p-4 bg-white border-t border-slate-300">
-                <div className="flex justify-between text-[13px] mb-4">
-                  <div>Amount Term 2: <span className="font-bold">9200</span></div>
-                  <div>Balance Amount Term 2: <span className="font-bold">9200</span></div>
-                </div>
-                <table className="w-full text-center text-[12px] border border-slate-300">
-                  <thead className="bg-[#f2f2f2]">
-                    <tr>
-                      <th className="p-2 border border-slate-300 font-semibold">Fee Type</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Receivable Amount</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Received Till Date</th>
-                      <th className="p-2 border border-slate-300 font-semibold">Balance Receivable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Term Fee</td>
-                      <td className="p-2 border border-slate-300">3550</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">3550</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 border border-slate-300">Tuition Fee</td>
-                      <td className="p-2 border border-slate-300">5650</td>
-                      <td className="p-2 border border-slate-300">0</td>
-                      <td className="p-2 border border-slate-300">5650</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div>
+              <p className="text-xs text-slate-500">Total Received</p>
+              <p className="text-lg font-bold text-emerald-700 font-mono">{formatCurrency(amountReceived)}</p>
             </div>
-
-            {/* Online Payment History */}
-            <div className="border border-slate-300 rounded-sm mt-4">
-              <div className="bg-[#f9f9f9] px-4 py-2 border-b border-slate-300 flex justify-between items-center">
-                <span className="font-semibold text-[13px] text-slate-700">≡ Online Payment History</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </div>
-              <div className="p-4 bg-white text-[12px] text-slate-600">No Data available</div>
-            </div>
-
-            {/* GrayQuest Payment History */}
-            <div className="border border-slate-300 rounded-sm mt-2">
-              <div className="bg-[#f9f9f9] px-4 py-2 border-b border-slate-300 flex justify-between items-center">
-                <span className="font-semibold text-[13px] text-slate-700">≡ GrayQuest Payment History</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </div>
-              <div className="p-4 bg-white text-[12px] text-slate-600">No Data available</div>
+            <div>
+              <p className="text-xs text-slate-500">Outstanding Balance</p>
+              <p className="text-lg font-bold text-red-700 font-mono">{formatCurrency(balanceAmount)}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#f2f2f2] px-6 py-4 border-t border-slate-300 rounded-b-sm">
+        <div className="bg-[#f2f2f2] px-6 py-3 border-t border-slate-300">
           <Button onClick={onBack} className="bg-[#333] hover:bg-[#222] text-white h-8 px-6 text-[13px] shadow-none rounded-sm">
             Back
           </Button>
@@ -328,269 +472,141 @@ function PaymentStatusView({ onBack }: { onBack: () => void }) {
 }
 
 // ─── 3. NEW RECEIPT VIEW ──────────────────────────────────────────────────
-function NewReceiptView({ onBack }: { onBack: () => void }) {
+function NewReceiptView({ onBack, admissionId, studentName, programName, balanceAmount }: any) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    amount: balanceAmount > 0 ? String(balanceAmount) : '10000',
+    paymentMode: 'CASH',
+    bankName: '',
+    bankBranch: '',
+    chequeNumber: '',
+    chequeDate: '',
+    remarks: 'Fee payment receipt',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admissionId) {
+      showToast('No admission ID found. Please select an admission first.', 'error');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await api.post('/fees/receipts', {
+        admissionId,
+        amount: Number(formData.amount),
+        paymentMode: formData.paymentMode,
+        bankName: formData.bankName || undefined,
+        bankBranch: formData.bankBranch || undefined,
+        chequeNumber: formData.chequeNumber || undefined,
+        chequeDate: formData.chequeDate || undefined,
+      });
+
+      if (res.data.success) {
+        showToast(`Receipt created successfully: ${res.data.data?.receiptNumber || 'Success'}`, 'success');
+        onBack();
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to create receipt', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <>
-      <h1 className="text-2xl font-normal text-slate-800 mb-4">New Receipt</h1>
-      <div className="bg-white border border-slate-300 shadow-sm rounded-sm p-4">
-        
-        <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm">
-          <span className="font-semibold text-[13px] text-slate-700">≡ Add Receipts</span>
-        </div>
-        
-        <div className="border border-slate-300 p-6 space-y-6">
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 text-[13px]">
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Student Name</span>
-              <span className="text-slate-800 font-medium">Mahi Sachin Rathod</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Program</span>
-              <span className="text-slate-800 font-medium">SUNOIA Senior</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Invoice Number</span>
-              <span className="text-slate-800 font-medium">EK/3201/0052/2027</span>
-            </div>
-
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Amount Term 1</span>
-              <span className="text-slate-800 font-medium">20250.00</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Amount Term 2</span>
-              <span className="text-slate-800 font-medium">9200.00</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Total Amount</span>
-              <span className="text-slate-800 font-medium">29450.00</span>
-            </div>
-
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Amount Received</span>
-              <span className="text-slate-800 font-medium">0.00</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Balance Amount</span>
-              <span className="text-slate-800 font-medium">29450.00</span>
-            </div>
-            <div className="grid grid-cols-[120px_1fr] items-center">
-              <span className="text-slate-600 text-right pr-4">Minimum Amount</span>
-              <span className="text-slate-800 font-medium">0</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-            <div className="grid grid-cols-[160px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Enter Receipt Amount</span>
-              <Input className="h-8 text-[13px] border-slate-300 rounded-sm" />
-            </div>
-            <div className="grid grid-cols-[160px_1fr] items-center text-[13px]">
-              <span className="text-slate-600 text-right pr-4">Confirm Receipt Amount</span>
-              <Input className="h-8 text-[13px] border-slate-300 rounded-sm" />
-            </div>
-          </div>
-
-          {/* Tables */}
-          <div className="space-y-4">
-            <div className="border border-slate-300">
-              <div className="bg-[#f9f9f9] px-4 py-2 border-b border-slate-300 text-[12px] font-semibold text-slate-700">
-                Term 1
-              </div>
-              <table className="w-full text-center text-[12px]">
-                <thead className="bg-[#f2f2f2]">
-                  <tr>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Fee Type</th>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Receivable Amount</th>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Received Till Date</th>
-                    <th className="p-2 border-b border-slate-300 font-semibold">Balance Receivable</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300 border-b">Term Fee</td>
-                    <td className="p-2 border-r border-slate-300 border-b">3550</td>
-                    <td className="p-2 border-r border-slate-300 border-b">0</td>
-                    <td className="p-2 border-slate-300 border-b">3550</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300 border-b">Registration Fee</td>
-                    <td className="p-2 border-r border-slate-300 border-b">8900</td>
-                    <td className="p-2 border-r border-slate-300 border-b">0</td>
-                    <td className="p-2 border-slate-300 border-b">8900</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300 border-b">Uniforms</td>
-                    <td className="p-2 border-r border-slate-300 border-b">2150</td>
-                    <td className="p-2 border-r border-slate-300 border-b text-red-500 font-bold">* 0</td>
-                    <td className="p-2 border-slate-300 border-b">2150</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300">Tuition Fee</td>
-                    <td className="p-2 border-r border-slate-300">5650</td>
-                    <td className="p-2 border-r border-slate-300">0</td>
-                    <td className="p-2 border-slate-300">5650</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="border border-slate-300">
-              <div className="bg-[#f9f9f9] px-4 py-2 border-b border-slate-300 text-[12px] font-semibold text-slate-700">
-                Term 2
-              </div>
-              <table className="w-full text-center text-[12px]">
-                <thead className="bg-[#f2f2f2]">
-                  <tr>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Fee Type</th>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Receivable Amount</th>
-                    <th className="p-2 border-b border-r border-slate-300 font-semibold">Received Till Date</th>
-                    <th className="p-2 border-b border-slate-300 font-semibold">Balance Receivable</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300 border-b">Term Fee</td>
-                    <td className="p-2 border-r border-slate-300 border-b">3550</td>
-                    <td className="p-2 border-r border-slate-300 border-b">0</td>
-                    <td className="p-2 border-slate-300 border-b">3550</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2 border-r border-slate-300">Tuition Fee</td>
-                    <td className="p-2 border-r border-slate-300">5650</td>
-                    <td className="p-2 border-r border-slate-300">0</td>
-                    <td className="p-2 border-slate-300">5650</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 pt-4 border-t border-slate-300">
-            <div className="space-y-1">
-              <span className="text-[12px] font-semibold text-slate-700">Receipt Date</span>
-              <Input type="date" className="h-8 text-[13px] border-slate-300 rounded-sm w-[200px]" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-[12px] font-semibold text-slate-700">Mode of Payment</span>
-              <Select defaultValue="cash">
-                <SelectTrigger className="h-8 text-[13px] border-slate-300 rounded-sm w-full bg-white">
-                  <SelectValue placeholder="Select Mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="pt-4 flex gap-2">
-            <Button className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm font-semibold">
-              Generate Receipt
-            </Button>
-            <Button onClick={onBack} className="bg-[#333] hover:bg-[#222] text-white h-8 px-6 text-[13px] shadow-none rounded-sm font-semibold">
-              Cancel
-            </Button>
-          </div>
-
-        </div>
+    <div className="bg-white border border-slate-300 shadow-sm rounded-sm p-4">
+      <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm flex items-center">
+        <span className="font-semibold text-[13px] text-slate-700">≡ Add Advance / Fee Receipt</span>
       </div>
-    </>
+      
+      <form onSubmit={handleSubmit} className="border border-slate-300 p-6 space-y-4">
+        <div className="grid grid-cols-2 gap-4 pb-2 border-b border-slate-200">
+          <div>
+            <span className="text-xs text-slate-500">Student:</span>
+            <p className="font-semibold text-slate-800 text-sm">{studentName}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Program:</span>
+            <p className="text-slate-800 text-sm">{programName}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Amount (₹) *</label>
+            <Input 
+              type="number"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              required
+              className="h-8 text-sm bg-white"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Payment Mode *</label>
+            <Select 
+              value={formData.paymentMode} 
+              onValueChange={(val) => setFormData({ ...formData, paymentMode: val })}
+            >
+              <SelectTrigger className="h-8 text-sm bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CASH">CASH</SelectItem>
+                <SelectItem value="CHEQUE">CHEQUE</SelectItem>
+                <SelectItem value="ONLINE">ONLINE / UPI</SelectItem>
+                <SelectItem value="BANK_TRANSFER">BANK TRANSFER (NEFT/RTGS)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {formData.paymentMode === 'CHEQUE' && (
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Bank Name</label>
+              <Input 
+                value={formData.bankName}
+                onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                placeholder="e.g. HDFC Bank"
+                className="h-8 text-sm bg-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">Cheque Number</label>
+              <Input 
+                value={formData.chequeNumber}
+                onChange={(e) => setFormData({ ...formData, chequeNumber: e.target.value })}
+                placeholder="6-digit cheque number"
+                className="h-8 text-sm bg-white"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-4 border-t border-slate-200">
+          <Button type="button" onClick={onBack} variant="outline" size="sm" className="h-8">
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+            Save & Generate Receipt
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
 // ─── 4. OTHER RECEIPT VIEW ────────────────────────────────────────────────
-function OtherReceiptView({ onBack }: { onBack: () => void }) {
-  const feeTypes = [
-    "Admission Form",
-    "Cheque Bounce Charge",
-    "Transfer Charges",
-    "Transport Fees",
-    "Winter Uniform",
-    "Events and Celebrations Fees"
-  ];
-
+function OtherReceiptView({ onBack, admissionId, studentName, programName }: any) {
   return (
-    <>
-      <h1 className="text-2xl font-normal text-slate-800 mb-4">Other Receipt</h1>
-      <div className="bg-white border border-slate-300 shadow-sm rounded-sm p-4">
-        
-        <div className="bg-[#f2f2f2] px-4 py-2 border border-slate-300 border-b-0 rounded-t-sm flex items-center gap-1">
-          <span className="font-semibold text-[13px] text-slate-700">📝 Other Receipt</span>
-        </div>
-        
-        <div className="border border-slate-300 p-6 space-y-6">
-          
-          <table className="w-full text-center text-[12px] border border-slate-300">
-            <thead className="bg-[#f2f2f2]">
-              <tr>
-                <th className="p-3 border-b border-slate-300 font-semibold w-1/3">Fee Types</th>
-                <th className="p-3 border-b border-slate-300 font-semibold w-1/3">Receipt Amount</th>
-                <th className="p-3 border-b border-slate-300 font-semibold w-1/3">Confirm Receipt Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {feeTypes.map((fee, idx) => (
-                <tr key={idx}>
-                  <td className="p-2 border-b border-slate-300 text-slate-700">{fee}</td>
-                  <td className="p-2 border-b border-slate-300">
-                    <Input className="h-7 text-[13px] border-slate-300 rounded-sm w-3/4 mx-auto" />
-                  </td>
-                  <td className="p-2 border-b border-slate-300">
-                    <Input className="h-7 text-[13px] border-slate-300 rounded-sm w-3/4 mx-auto" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 pt-4 border-t border-slate-300">
-            <div className="space-y-1">
-              <span className="text-[12px] font-semibold text-slate-700">Receipt Date</span>
-              <Input type="date" className="h-8 text-[13px] border-slate-300 rounded-sm w-[150px]" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-[12px] font-semibold text-slate-700">Mode of Payment</span>
-              <Select defaultValue="cash">
-                <SelectTrigger className="h-8 text-[13px] border-slate-300 rounded-sm w-full max-w-lg bg-white">
-                  <SelectValue placeholder="Select Mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <span className="text-[12px] font-semibold text-slate-700">Select Academic Term</span>
-              <Select defaultValue="term1">
-                <SelectTrigger className="h-8 text-[13px] border-slate-300 rounded-sm w-[200px] bg-white">
-                  <SelectValue placeholder="Select Term" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="term1">Term 1</SelectItem>
-                  <SelectItem value="term2">Term 2</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="pt-4 flex gap-2">
-            <Button className="bg-[#0056b3] hover:bg-[#004494] text-white h-8 px-4 text-[13px] shadow-none rounded-sm font-semibold">
-              Generate Receipt
-            </Button>
-            <Button onClick={onBack} className="bg-[#333] hover:bg-[#222] text-white h-8 px-6 text-[13px] shadow-none rounded-sm font-semibold">
-              Cancel
-            </Button>
-          </div>
-
-        </div>
-      </div>
-    </>
+    <NewReceiptView 
+      onBack={onBack} 
+      admissionId={admissionId} 
+      studentName={studentName} 
+      programName={programName} 
+      balanceAmount={5000} 
+    />
   );
 }

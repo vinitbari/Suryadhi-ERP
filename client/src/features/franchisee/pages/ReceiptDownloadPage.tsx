@@ -27,8 +27,8 @@ interface FranchiseeReceipt {
 }
 
 const mockReceipts: FranchiseeReceipt[] = [
-  { id: 'r1', receiptNumber: 'REC-2026-000001', receiptDate: '2026-06-05', amount: 18500, paymentMode: 'ONLINE', admission: { student: { firstName: 'Aarav', lastName: 'Sharma', uin: 'EK/3201/0011/2627' } } },
-  { id: 'r2', receiptNumber: 'REC-2026-000002', receiptDate: '2026-06-10', amount: 25000, paymentMode: 'CHEQUE', admission: { student: { firstName: 'Kabir', lastName: 'Singh', uin: 'EK/3201/0014/2627' } } },
+  { id: 'r1', receiptNumber: 'REC-2026-000001', receiptDate: '2026-06-05', amount: 18500, paymentMode: 'ONLINE', admission: { student: { firstName: 'Aarav', lastName: 'Sharma', uin: 'SK/3201/0011/2627' } } },
+  { id: 'r2', receiptNumber: 'REC-2026-000002', receiptDate: '2026-06-10', amount: 25000, paymentMode: 'CHEQUE', admission: { student: { firstName: 'Kabir', lastName: 'Singh', uin: 'SK/3201/0014/2627' } } },
 ];
 
 export default function ReceiptDownloadPage() {

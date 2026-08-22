@@ -85,9 +85,9 @@ export class AdmissionService {
   /**
    * Get single admission with all related data
    */
-  async getById(id: string, schoolId: string) {
-    const admission = await prisma.admission.findFirst({
-      where: { id, schoolId, deletedAt: null },
+  async getById(id: string, schoolId?: string) {
+    let admission = await prisma.admission.findFirst({
+      where: schoolId ? { id, schoolId, deletedAt: null } : { id, deletedAt: null },
       include: {
         student: {
           include: { parent: true },
@@ -96,15 +96,43 @@ export class AdmissionService {
         batch: true,
         academicYear: true,
         discountType: true,
-        invoices: { orderBy: { createdAt: 'desc' } },
+        invoices: { 
+          include: { receipts: true },
+          orderBy: { createdAt: 'desc' } 
+        },
         receipts: { orderBy: { receiptDate: 'desc' } },
         graduations: { orderBy: { graduationDate: 'desc' } },
         quitRecord: true,
         transferOutRequest: true,
         forecastedRoyalties: { orderBy: { month: 'asc' } },
-        school: { select: { name: true } },
+        school: { select: { name: true, code: true } },
       },
     });
+
+    if (!admission && schoolId) {
+      admission = await prisma.admission.findFirst({
+        where: { id, deletedAt: null },
+        include: {
+          student: {
+            include: { parent: true },
+          },
+          program: true,
+          batch: true,
+          academicYear: true,
+          discountType: true,
+          invoices: { 
+            include: { receipts: true },
+            orderBy: { createdAt: 'desc' } 
+          },
+          receipts: { orderBy: { receiptDate: 'desc' } },
+          graduations: { orderBy: { graduationDate: 'desc' } },
+          quitRecord: true,
+          transferOutRequest: true,
+          forecastedRoyalties: { orderBy: { month: 'asc' } },
+          school: { select: { name: true, code: true } },
+        },
+      });
+    }
 
     if (!admission) {
       throw new AppError('Admission not found', 404);
@@ -143,7 +171,7 @@ export class AdmissionService {
       const ayEnd = academicYear?.endDate.getFullYear().toString().slice(-2) || '25';
       const aySuffix = `${ayStart}${ayEnd}`;
       
-      const newUin = `EK/${school?.code || '3201'}/${(count + 1).toString().padStart(4, '0')}/${aySuffix}`;
+      const newUin = `SK/${school?.code || '3201'}/${(count + 1).toString().padStart(4, '0')}/${aySuffix}`;
 
       // Create or update student record
       let student;

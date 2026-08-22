@@ -221,7 +221,7 @@ model SchoolAcademicYear {
 
 model Program {
   id           String   @id @default(cuid())
-  name         String   @unique // Play Group, Nursery, Euro Junior, Euro Senior
+  name         String   @unique // Play Group, Nursery, SUNOIA Junior, SUNOIA Senior
   shortName    String?  @map("short_name") // PG, NR, EJ, ES
   ageFrom      Int?     @map("age_from") // Minimum age in months
   ageTo        Int?     @map("age_to")   // Maximum age in months

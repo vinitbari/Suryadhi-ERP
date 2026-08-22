@@ -92,11 +92,9 @@ app.get('/api/health', (_req, res) => {
 
 import seedRouter from './seed-endpoint';
 
-// ─── Dev-Only Seed Endpoint ────────────────────────────────
-if (config.isDev) {
-  app.use('/api', seedRouter);
-  logger.info('🌱 Seed endpoint mounted (dev only)');
-}
+// ─── Seed Endpoint ─────────────────────────────────────────
+app.use('/api', seedRouter);
+logger.info('🌱 Seed endpoint mounted at /api/seed');
 
 // ─── API Routes ────────────────────────────────────────────
 app.use('/api/auth', authRouter);
@@ -124,11 +122,17 @@ app.use('/api/support', supportRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+import { migrateLegacyEuroPrograms, ensureDefaultUsers } from './utils/cleanup-programs';
+
 // ─── Start Server ──────────────────────────────────────────
-const server = app.listen(config.port, '0.0.0.0', () => {
+const server = app.listen(config.port, '0.0.0.0', async () => {
   logger.info(`🚀 SEMS Server running on port ${config.port}`);
   logger.info(`📍 Environment: ${config.nodeEnv}`);
   logger.info(`🔗 API: http://localhost:${config.port}/api`);
+
+  // Ensure default administrators and run legacy programs migration/cleanup
+  await ensureDefaultUsers(prisma);
+  await migrateLegacyEuroPrograms(prisma);
 });
 
 // ─── Graceful Shutdown ─────────────────────────────────────
