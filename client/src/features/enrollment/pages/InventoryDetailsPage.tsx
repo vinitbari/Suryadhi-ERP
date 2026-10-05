@@ -278,26 +278,29 @@ export default function InventoryDetailsPage() {
         title="Inventory Details"
         description="Track student welcome kit allocations, manual stock levels, and D-Model purchase order adjustments."
       >
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-9 gap-1.5 font-semibold shadow-sm"
-          >
-            <BarChart2 className="w-4 h-4" />
-            Manual Stock Details
-          </Button>
+        <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
+          {/* Top Button Row */}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-9 gap-1.5 font-semibold shadow-sm"
+            >
+              <BarChart2 className="w-4 h-4" />
+              Manual Stock Details
+            </Button>
 
-          <Button
-            onClick={() => setIsReportOpen(true)}
-            variant="outline"
-            className="border-slate-300 hover:bg-slate-50 text-slate-800 text-xs h-9 gap-1.5 font-semibold shadow-sm"
-          >
-            <FileText className="w-4 h-4 text-slate-600" />
-            Inventory Details Report
-          </Button>
+            <Button
+              onClick={() => setIsReportOpen(true)}
+              variant="outline"
+              className="border-slate-300 hover:bg-slate-50 text-slate-800 text-xs h-9 gap-1.5 font-semibold shadow-sm"
+            >
+              <FileText className="w-4 h-4 text-slate-600" />
+              Inventory Details Report
+            </Button>
+          </div>
 
-          {/* Export Toolbar */}
-          <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white shadow-xs">
+          {/* Export Toolbar - Aligned to the rightmost edge */}
+          <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white shadow-xs self-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase px-2">Export:</span>
             <Button
               variant="ghost"
