@@ -13,6 +13,16 @@ router.get('/calculate', validate(calculateFeeSchema, 'query'), (req, res, next)
   feeController.calculate(req, res, next)
 );
 
+// GET /api/fees/receipt/:id — Single receipt details by receipt ID
+router.get('/receipt/:id', (req, res, next) =>
+  feeController.getReceiptById(req, res, next)
+);
+
+// GET /api/fees/receipts/single/:id — Single receipt details by receipt ID
+router.get('/receipts/single/:id', (req, res, next) =>
+  feeController.getReceiptById(req, res, next)
+);
+
 // GET /api/fees/receipts/:admissionId
 router.get('/receipts/:admissionId', (req, res, next) =>
   feeController.getReceipts(req, res, next)

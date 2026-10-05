@@ -16,6 +16,13 @@ export class FeeController {
     } catch (error) { next(error); }
   }
 
+  async getReceiptById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await feeService.getReceiptById(req.params.id as string, req.user?.schoolId);
+      res.json({ success: true, data: result });
+    } catch (error) { next(error); }
+  }
+
   async createReceipt(req: Request, res: Response, next: NextFunction) {
     try {
       const receipt = await feeService.createReceipt(req.user!.schoolId!, req.body, req.user!.userId);

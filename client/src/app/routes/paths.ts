@@ -74,6 +74,8 @@ export const PATHS = {
     FUNDS_TRANSFER: '/fees/funds-transfer',
     HOMEBUDDY: '/fees/homebuddy',
     ONLINE_PAYMENTS: '/fees/online-payments',
+    RECEIPT_PRINT: (id = ':id') => `/fees/receipts/${id}/print`,
+    RECEIPT_VIEW: (id = ':id') => `/fees/receipts/${id}`,
   },
   SOA: {
     SUMMARY: '/soa/summary',

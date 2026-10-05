@@ -163,6 +163,10 @@ export default function AppRoutes() {
           <Route path={PATHS.FEES.FUNDS_TRANSFER} element={<FundsTransferPage />} />
           <Route path={PATHS.FEES.HOMEBUDDY} element={<HomebuddyFeePage />} />
           <Route path={PATHS.FEES.ONLINE_PAYMENTS} element={<OnlinePaymentsPage />} />
+          <Route path="/fees/receipts/:id/print" element={<PrintReceiptPage />} />
+          <Route path="/fees/receipts/:id" element={<PrintReceiptPage />} />
+          <Route path="/fees/receipt/:id/print" element={<PrintReceiptPage />} />
+          <Route path="/fees/receipt/:id" element={<PrintReceiptPage />} />
 
           {/* Franchisee */}
           <Route path={PATHS.FRANCHISEE.INVOICES} element={<ViewInvoicePage />} />

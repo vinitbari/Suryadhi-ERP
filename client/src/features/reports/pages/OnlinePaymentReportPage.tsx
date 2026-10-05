@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { type ColumnDef } from '@tanstack/react-table';
 import DataTable from '@/components/shared/DataTable';
 import PageHeader from '@/components/shared/PageHeader';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Download, Landmark, Receipt, Calendar, CreditCard } from 'lucide-react';
+import { Download, Landmark, Receipt, Calendar, CreditCard, Eye } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import api from '@/api/client';
 import { apiDownload } from '@/lib/downloadUtils';
@@ -72,7 +73,14 @@ export default function OnlinePaymentReportPage() {
     {
       accessorKey: 'receiptNumber',
       header: 'Receipt Number',
-      cell: ({ getValue }) => <span className="font-mono font-bold text-slate-800">{getValue() as string}</span>,
+      cell: ({ row, getValue }) => (
+        <Link
+          to={`/fees/receipts/${row.original.id}/print`}
+          className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+        >
+          {getValue() as string}
+        </Link>
+      ),
     },
     {
       id: 'student',
@@ -114,6 +122,20 @@ export default function OnlinePaymentReportPage() {
       accessorKey: 'amount',
       header: () => <div className="text-right">Paid Amount</div>,
       cell: ({ getValue }) => <div className="text-right font-mono font-bold text-slate-900">{formatCurrency(Number(getValue()))}</div>,
+    },
+    {
+      id: 'action',
+      header: () => <div className="text-center">Action</div>,
+      cell: ({ row }) => (
+        <div className="text-center">
+          <Link to={`/fees/receipts/${row.original.id}/print`}>
+            <Button variant="outline" size="sm" className="h-7 text-xs border-blue-600 text-blue-600 hover:bg-blue-50 px-2.5 gap-1 font-medium">
+              <Eye className="h-3.5 w-3.5" />
+              <span>View</span>
+            </Button>
+          </Link>
+        </div>
+      ),
     },
   ];
 
