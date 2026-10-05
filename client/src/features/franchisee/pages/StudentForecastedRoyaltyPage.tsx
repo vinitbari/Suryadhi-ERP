@@ -31,7 +31,7 @@ export default function StudentForecastedRoyaltyPage() {
               </div>
               <div className="flex gap-4">
                 <span className="text-[13px] text-slate-700 w-[50px] text-right">UIN</span>
-                <span className="text-[13px] text-slate-600">EK/3201/0052/2627</span>
+                <span className="text-[13px] text-slate-600">SNK/3201/0052/2627</span>
               </div>
             </div>
 

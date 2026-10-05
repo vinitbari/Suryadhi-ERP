@@ -6,6 +6,7 @@ import {
   updateEnquirySchema,
   enquiryFollowUpSchema,
   enquiryListQuerySchema,
+  advanceReceiptSchema,
 } from './schema';
 
 const router = Router();
@@ -53,6 +54,20 @@ router.post(
   '/:id/convert',
   authorize('SUPER_ADMIN', 'SCHOOL_ADMIN'),
   (req, res, next) => enquiryController.convert(req, res, next)
+);
+
+// GET /api/enquiries/:id/receipts & /api/enquiries/:id/advance-receipts
+router.get(
+  ['/:id/receipts', '/:id/advance-receipts'],
+  (req, res, next) => enquiryController.getAdvanceReceipts(req, res, next)
+);
+
+// POST /api/enquiries/:id/receipts & /api/enquiries/:id/advance-receipts
+router.post(
+  ['/:id/receipts', '/:id/advance-receipts'],
+  authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'),
+  validate(advanceReceiptSchema),
+  (req, res, next) => enquiryController.createAdvanceReceipt(req, res, next)
 );
 
 // DELETE /api/enquiries/:id

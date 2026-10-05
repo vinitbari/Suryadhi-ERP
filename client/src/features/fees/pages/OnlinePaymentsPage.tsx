@@ -100,8 +100,7 @@ export default function OnlinePaymentsPage() {
   const buildParamsAndFetch = useCallback(() => {
     const params: Record<string, string> = {};
     if (paymentGateway !== 'All') params.paymentGateway = paymentGateway;
-    // ✅ FIX: only send paymentStatus when 'CANCELLED'; server only filters on this value
-    if (paymentStatus === 'CANCELLED') params.paymentStatus = 'CANCELLED';
+    if (paymentStatus !== 'All') params.paymentStatus = paymentStatus;
     if (fromDate) params.from = fromDate;
     if (toDate) params.to = toDate;
     if (search) params.search = search;
@@ -208,6 +207,7 @@ export default function OnlinePaymentsPage() {
                   >
                     <option value="All">All</option>
                     <option value="SUCCESS">Success</option>
+                    <option value="FAILED">Failed</option>
                     <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
@@ -284,6 +284,7 @@ export default function OnlinePaymentsPage() {
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
+                <option value={100}>100</option>
               </select>
               entries
             </div>

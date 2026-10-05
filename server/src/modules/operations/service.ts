@@ -1,11 +1,11 @@
-import { PrismaClient, OrderStatus } from '@prisma/client';
+import prisma from '../../config/database';
+import { OrderStatus } from '@prisma/client';
+import { getNextSequenceNumber } from '../../utils/helpers';
 import { 
   CreatePurchaseOrderInput, 
   UpdatePurchaseOrderStatusInput, 
   ReportShortageDamageInput 
 } from './schema';
-
-const prisma = new PrismaClient();
 
 export class OperationsService {
   async getPurchaseOrders(schoolId: string) {
@@ -16,10 +16,11 @@ export class OperationsService {
   }
 
   async createPurchaseOrder(schoolId: string, data: CreatePurchaseOrderInput) {
+    const orderNumber = data.orderNumber || await getNextSequenceNumber('PO', schoolId, prisma, 5);
     return prisma.purchaseOrder.create({
       data: {
         schoolId,
-        orderNumber: data.orderNumber,
+        orderNumber,
         items: data.items,
         totalAmount: data.totalAmount,
         notes: data.notes,
@@ -69,6 +70,127 @@ export class OperationsService {
       }
     });
   }
+
+  async getExchangeOrders(schoolId: string) {
+    try {
+      if ((prisma as any).exchangeOrder) {
+        return await (prisma as any).exchangeOrder.findMany({
+          where: { schoolId },
+          orderBy: { requestedAt: 'desc' }
+        });
+      }
+    } catch {
+      // fallback to memory
+    }
+    return inMemoryExchangeOrders.filter(o => !schoolId || o.schoolId === schoolId || o.schoolId === 'school-1');
+  }
+
+  async createExchangeOrder(schoolId: string, data: any) {
+    const orderNumber = await getNextSequenceNumber('EXC', schoolId, prisma, 3);
+    const newOrder: ExchangeOrderItem = {
+      id: `exc_${Date.now()}`,
+      orderNumber,
+      schoolId: schoolId || 'school-1',
+      studentName: data.studentName || 'Student',
+      uin: data.uin || 'SEMS/3201/0099/2627',
+      program: data.program || 'Nursery',
+      itemExchanged: data.itemExchanged,
+      newItemRequested: data.newItemRequested,
+      reason: data.reason || 'Replacement requested',
+      status: 'PENDING',
+      requestedAt: new Date(),
+    };
+    inMemoryExchangeOrders.unshift(newOrder);
+    try {
+      if ((prisma as any).exchangeOrder) {
+        return await (prisma as any).exchangeOrder.create({
+          data: newOrder
+        });
+      }
+    } catch {
+      // fallback
+    }
+    return newOrder;
+  }
+
+  async updateExchangeOrderStatus(id: string, schoolId: string, status: string) {
+    const found = inMemoryExchangeOrders.find(o => o.id === id || o.orderNumber === id);
+    if (found) {
+      found.status = status;
+      if (status === 'COMPLETED' || status === 'RESOLVED') {
+        found.resolvedAt = new Date();
+      }
+      return found;
+    }
+    try {
+      if ((prisma as any).exchangeOrder) {
+        return await (prisma as any).exchangeOrder.update({
+          where: { id },
+          data: { status }
+        });
+      }
+    } catch {
+      // fallback
+    }
+    return { id, status };
+  }
 }
+
+interface ExchangeOrderItem {
+  id: string;
+  orderNumber: string;
+  schoolId: string;
+  studentName: string;
+  uin: string;
+  program: string;
+  itemExchanged: string;
+  newItemRequested: string;
+  reason: string;
+  status: string;
+  requestedAt: Date;
+  resolvedAt?: Date | null;
+}
+
+let inMemoryExchangeOrders: ExchangeOrderItem[] = [
+  {
+    id: 'exc_001',
+    orderNumber: 'EXC-2026-001',
+    schoolId: 'school-1',
+    studentName: 'Aarav Sharma',
+    uin: 'SEMS/3201/0012/2627',
+    program: 'Play Group',
+    itemExchanged: 'T-Shirt (Size: S)',
+    newItemRequested: 'T-Shirt (Size: M)',
+    reason: 'Size too small',
+    status: 'DISPATCHED',
+    requestedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'exc_002',
+    orderNumber: 'EXC-2026-002',
+    schoolId: 'school-1',
+    studentName: 'Ananya Verma',
+    uin: 'SEMS/3201/0025/2627',
+    program: 'Nursery',
+    itemExchanged: 'Nursery Welcome Kit (Damaged Box)',
+    newItemRequested: 'Nursery Welcome Kit (Replacement)',
+    reason: 'Box damaged during transit',
+    status: 'IN_PROCESS',
+    requestedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'exc_003',
+    orderNumber: 'EXC-2026-003',
+    schoolId: 'school-1',
+    studentName: 'Kabir Patel',
+    uin: 'SEMS/3201/0044/2627',
+    program: 'SUNOIA Junior',
+    itemExchanged: 'Activity Book Part 1',
+    newItemRequested: 'Activity Book Part 1 (Misprint replacement)',
+    reason: 'Misprinted pages 12-16',
+    status: 'PENDING',
+    requestedAt: new Date(),
+  },
+];
 
 export const operationsService = new OperationsService();

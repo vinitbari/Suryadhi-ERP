@@ -11,7 +11,7 @@ export class FeeController {
 
   async getReceipts(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await feeService.getReceipts(req.params.admissionId as string, req.user!.schoolId!);
+      const result = await feeService.getReceipts(req.params.admissionId as string, req.user?.schoolId);
       res.json({ success: true, data: result });
     } catch (error) { next(error); }
   }

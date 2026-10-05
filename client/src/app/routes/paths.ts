@@ -18,6 +18,7 @@ export const PATHS = {
     CONVERT: (id = ':id') => `/enquiry/${id}/convert`,
     RECEIPTS: (id = ':id') => `/enquiry/${id}/receipts`,
     ADD_RECEIPT: (id = ':id') => `/enquiry/${id}/receipts/add`,
+    LSQ: '/enquiry/lsq',
   },
 
   // ── Admission ──────────────────────────────────────────
@@ -124,6 +125,7 @@ export const PATHS = {
 
   // ── Settings / Admin ────────────────────────────
   SETTINGS: {
+    SYSTEM: '/settings/system',
     ACADEMIC_YEARS: '/settings/academic-years',
   },
 } as const;

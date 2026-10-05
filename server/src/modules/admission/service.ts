@@ -1,6 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
-import { createAuditLog } from '../../utils/helpers';
+import { createAuditLog, getNextSequenceNumber, getNextSequenceValue } from '../../utils/helpers';
 import {
   CreateAdmissionInput,
   UpdateAdmissionInput,
@@ -137,13 +137,13 @@ export class AdmissionService {
       // Fetch school and academic year for UIN generation
       const school = await tx.school.findUnique({ where: { id: schoolId } });
       const academicYear = await tx.academicYear.findUnique({ where: { id: input.academicYearId } });
-      const count = await tx.admission.count({ where: { schoolId, academicYearId: input.academicYearId } });
+      const seq = await getNextSequenceValue(`UIN_${input.academicYearId}`, schoolId, tx);
 
       const ayStart = academicYear?.startDate.getFullYear().toString().slice(-2) || '24';
       const ayEnd = academicYear?.endDate.getFullYear().toString().slice(-2) || '25';
       const aySuffix = `${ayStart}${ayEnd}`;
       
-      const newUin = `EK/${school?.code || '3201'}/${(count + 1).toString().padStart(4, '0')}/${aySuffix}`;
+      const newUin = `SNK/${school?.code || '3201'}/${seq.toString().padStart(4, '0')}/${aySuffix}`;
 
       // Create or update student record
       let student;
@@ -266,8 +266,7 @@ export class AdmissionService {
         const netAmount = totalAmount - discountAmount;
 
         // Create Invoice
-        const invoiceCount = await tx.invoice.count();
-        const invoiceNumber = `INV-${new Date().getFullYear()}-${(invoiceCount + 1).toString().padStart(6, '0')}`;
+        const invoiceNumber = await getNextSequenceNumber('INV', schoolId, tx, 6);
 
         const invoice = await tx.invoice.create({
           data: {
@@ -278,24 +277,50 @@ export class AdmissionService {
             totalAmount,
             discountAmount,
             netAmount,
-            status: 'PAID',
+            status: 'GENERATED',
           },
         });
 
-        // Generate Automatic Receipt
-        const receiptCount = await tx.receipt.count();
-        const receiptNumber = `REC-${new Date().getFullYear()}-${(receiptCount + 1).toString().padStart(6, '0')}`;
+        // Adjust enquiry advance receipts: carry them over as admission receipts
+        if (input.enquiryId) {
+          const advanceReceipts = await tx.advanceReceipt.findMany({
+            where: { enquiryId: input.enquiryId },
+          });
 
-        await tx.receipt.create({
-          data: {
-            receiptNumber,
-            receiptDate: new Date(),
-            amount: netAmount,
-            paymentMode: 'ONLINE',
-            admissionId: admission.id,
-            invoiceId: invoice.id,
-          },
-        });
+          let totalAdvancePaid = 0;
+          for (const ar of advanceReceipts) {
+            const arReceiptNumber = await getNextSequenceNumber('RCP', schoolId, tx, 6);
+
+            await tx.receipt.create({
+              data: {
+                receiptNumber: arReceiptNumber,
+                receiptDate: ar.receiptDate,
+                amount: ar.amount,
+                paymentMode: ar.paymentMode,
+                bankName: ar.bankName,
+                chequeNumber: ar.chequeNumber,
+                chequeDate: ar.chequeDate,
+                admissionId: admission.id,
+                invoiceId: invoice.id,
+              },
+            });
+
+            totalAdvancePaid += Number(ar.amount);
+          }
+
+          // Update invoice status based on advance payments
+          if (totalAdvancePaid >= netAmount) {
+            await tx.invoice.update({
+              where: { id: invoice.id },
+              data: { status: 'PAID' },
+            });
+          } else if (totalAdvancePaid > 0) {
+            await tx.invoice.update({
+              where: { id: invoice.id },
+              data: { status: 'PARTIALLY_PAID' },
+            });
+          }
+        }
 
         // Create SOA Entry for Franchisee Fees (Debit Invoice)
         await tx.sOAEntry.create({
@@ -307,19 +332,6 @@ export class AdmissionService {
             invoiceAmount: netAmount,
             receiptAmount: 0,
             balance: netAmount,
-          },
-        });
-
-        // Create SOA Entry for Receipt (Credit Receipt)
-        await tx.sOAEntry.create({
-          data: {
-            schoolId,
-            entryDate: new Date(),
-            particulars: `Term Fees Receipt - ${student.firstName} ${student.lastName} (Auto-generated)`,
-            entryType: 'FRANCHISEE_FEES',
-            invoiceAmount: 0,
-            receiptAmount: netAmount,
-            balance: -netAmount,
           },
         });
       }
@@ -393,6 +405,7 @@ export class AdmissionService {
       if (input.isKinAttended !== undefined) admissionUpdate.isKinAttended = input.isKinAttended;
       if (input.hasSibling !== undefined) admissionUpdate.hasSibling = input.hasSibling;
       if (input.discountTypeId !== undefined) admissionUpdate.discountTypeId = input.discountTypeId;
+      if ((input as any).admissionDate !== undefined) admissionUpdate.admissionDate = new Date((input as any).admissionDate);
 
       const updated = await tx.admission.update({
         where: { id },
@@ -403,6 +416,108 @@ export class AdmissionService {
           batch: true,
         },
       });
+
+      // ── Invoice Regeneration ──────────────────────────────────
+      // If programId or admissionDate changed, cancel old invoices and regenerate
+      const programChanged = input.programId !== undefined && input.programId !== existing.programId;
+      const dateChanged = (input as any).admissionDate !== undefined;
+
+      if (programChanged || dateChanged) {
+        // Soft-cancel existing invoices that are not yet paid
+        const existingInvoices = await tx.invoice.findMany({
+          where: { admissionId: id, deletedAt: null },
+        });
+
+        for (const inv of existingInvoices) {
+          // Only cancel GENERATED invoices, not ones with payments
+          const paidReceipts = await tx.receipt.count({
+            where: { invoiceId: inv.id, isCancelled: false },
+          });
+          if (paidReceipts === 0) {
+            await tx.invoice.update({
+              where: { id: inv.id },
+              data: { status: 'CANCELLED', deletedAt: new Date() },
+            });
+          }
+        }
+
+        // Regenerate invoice from current fee structure
+        const effectiveProgramId = input.programId || existing.programId;
+        const feeStructures = await tx.feeStructure.findMany({
+          where: {
+            schoolId,
+            programId: effectiveProgramId,
+            academicYearId: existing.academicYearId,
+            isActive: true,
+          },
+        });
+
+        if (feeStructures.length > 0) {
+          const effectiveDiscountTypeId = input.discountTypeId !== undefined
+            ? input.discountTypeId
+            : existing.discountTypeId;
+
+          let discount = null;
+          if (effectiveDiscountTypeId) {
+            discount = await tx.discountType.findUnique({
+              where: { id: effectiveDiscountTypeId },
+            });
+          }
+
+          let term1Amount = 0;
+          let term2Amount = 0;
+          let totalAmount = 0;
+
+          feeStructures.forEach((fs) => {
+            term1Amount += Number(fs.term1Amount);
+            term2Amount += Number(fs.term2Amount);
+            totalAmount += Number(fs.totalAmount);
+          });
+
+          const isDiscountApplicable = input.isDiscountApplicable !== undefined
+            ? input.isDiscountApplicable
+            : existing.isDiscountApplicable;
+
+          let discountAmount = 0;
+          if (discount && isDiscountApplicable) {
+            if (discount.percentage) {
+              discountAmount = totalAmount * (Number(discount.percentage) / 100);
+            } else if (discount.flatAmount) {
+              discountAmount = Number(discount.flatAmount);
+            }
+          }
+
+          const netAmount = totalAmount - discountAmount;
+
+          const invoiceNumber = await getNextSequenceNumber('INV', schoolId, tx, 6);
+
+          await tx.invoice.create({
+            data: {
+              invoiceNumber,
+              admissionId: id,
+              term1Amount,
+              term2Amount,
+              totalAmount,
+              discountAmount,
+              netAmount,
+              status: 'GENERATED',
+            },
+          });
+
+          // Create SOA Entry for updated invoice
+          await tx.sOAEntry.create({
+            data: {
+              schoolId,
+              entryDate: new Date(),
+              particulars: `Updated Term Fees Invoice - ${existing.student.firstName} ${existing.student.lastName}`,
+              entryType: 'FRANCHISEE_FEES',
+              invoiceAmount: netAmount,
+              receiptAmount: 0,
+              balance: netAmount,
+            },
+          });
+        }
+      }
 
       await createAuditLog({
         userId,

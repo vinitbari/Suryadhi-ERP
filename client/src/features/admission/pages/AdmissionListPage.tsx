@@ -4,6 +4,7 @@ import api from '@/api/client';
 import DataTable from '@/components/shared/DataTable';
 import { AdmissionActionButtons } from '@/features/admission';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download } from 'lucide-react';
 import { apiDownload } from '@/lib/downloadUtils';
 
@@ -68,12 +69,13 @@ export default function AdmissionListPage() {
   const [programCounts, setProgramCounts] = useState<ProgramCount[]>(dummyProgramCounts);
   const [isLoading, setIsLoading] = useState(true);
   const [currentYear] = useState('Apr 26 - Mar 27');
+  const [showEntries, setShowEntries] = useState('25');
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const [admissionsRes, countsRes] = await Promise.all([
-          api.get('/admissions?limit=100&status=ACTIVE'),
+          api.get(`/admissions?limit=${showEntries}&status=ACTIVE`),
           api.get('/reports/admission-count'),
         ]);
 
@@ -107,7 +109,7 @@ export default function AdmissionListPage() {
       }
     };
     fetchAll();
-  }, []);
+  }, [showEntries]);
 
   const totalAdmissions = programCounts.reduce((sum, p) => sum + p.count, 0);
 
@@ -115,7 +117,7 @@ export default function AdmissionListPage() {
     <div className="max-w-[1600px] mx-auto space-y-4 pt-2">
       <h1 className="text-2xl font-normal text-slate-800">Admission</h1>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — 4 Programs + Total */}
       <div className="grid grid-cols-5 gap-4">
         {programCounts.map((prog) => (
           <div key={prog.shortName} className="bg-white border border-slate-200 p-3 pt-2 shadow-sm rounded-sm">
@@ -163,8 +165,25 @@ export default function AdmissionListPage() {
         </Button>
       </div>
 
-      {/* Data Table */}
+      {/* Data Table with Show Entries */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-sm p-4 pt-2">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Show</span>
+            <Select value={showEntries} onValueChange={setShowEntries}>
+              <SelectTrigger className="w-[70px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-slate-500">entries</span>
+          </div>
+        </div>
         <DataTable
           columns={columns}
           data={data}

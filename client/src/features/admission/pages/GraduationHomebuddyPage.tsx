@@ -18,10 +18,10 @@ interface GraduationRow {
 const dummyData: GraduationRow[] = [
   { id: '1', name: 'Aditi Nikesh Ade', uin: 'SEMS/3201/0070/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '1' },
   { id: '2', name: 'Advit Ganesh Pinnamwar', uin: 'SEMS/3201/0048/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '2' },
-  { id: '3', name: 'Akshay Amit Jadhao', uin: 'EK/3201/0024/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '3' },
-  { id: '4', name: 'Anjali Sanjay Karewad', uin: 'EK/3201/0044/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '4' },
-  { id: '5', name: 'Anviksha Satish Wankhede', uin: 'EK/3201/0053/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '5' },
-  { id: '6', name: 'Ayansh Nandkishor Dawale', uin: 'EK/3201/0059/2526', currProg: 'Nursery', expProg: 'SUNOIA Junior', payment: 'No', eligible: false, admissionId: '6' },
+  { id: '3', name: 'Akshay Amit Jadhao', uin: 'SNK/3201/0024/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '3' },
+  { id: '4', name: 'Anjali Sanjay Karewad', uin: 'SNK/3201/0044/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '4' },
+  { id: '5', name: 'Anviksha Satish Wankhede', uin: 'SNK/3201/0053/2526', currProg: 'SUNOIA Junior', expProg: 'SUNOIA Senior', payment: 'No', eligible: false, admissionId: '5' },
+  { id: '6', name: 'Ayansh Nandkishor Dawale', uin: 'SNK/3201/0059/2526', currProg: 'Nursery', expProg: 'SUNOIA Junior', payment: 'No', eligible: false, admissionId: '6' },
 ];
 
 const NEXT_PROGRAM: Record<string, string> = {
@@ -97,7 +97,12 @@ export default function GraduationHomebuddyPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto pb-12 pt-2 space-y-4">
-      <h1 className="text-[22px] font-normal text-[#333] mb-4">Graduate student via SEMS Parent App</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[22px] font-normal text-[#333]">Graduate Student via Home Sunny Parent App</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Track and verify graduation eligibility for enrolled students across academic terms</p>
+        </div>
+      </div>
 
       <div className="bg-white border border-[#ccc] shadow-sm p-4">
         {/* Table Top Toolbar */}
