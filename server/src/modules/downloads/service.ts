@@ -1,3 +1,4 @@
+import { normalizeTimeSlot } from '../../utils/helpers';
 import prisma from '../../config/database';
 
 const DEFAULT_DOWNLOAD_LIMIT = 5000;
@@ -51,7 +52,7 @@ export class DownloadService {
       'Date of Birth': r.student.dateOfBirth ? new Date(r.student.dateOfBirth).toLocaleDateString('en-IN') : '',
       Gender: r.student.gender ?? '',
       Program: r.program.name,
-      Batch: r.batch?.timeSlot ?? '',
+      Batch: normalizeTimeSlot(r.batch?.timeSlot),
       'Academic Year': r.academicYear?.label ?? '',
       'Admission Date': new Date(r.admissionDate).toLocaleDateString('en-IN'),
       Status: r.status,
@@ -205,7 +206,7 @@ export class DownloadService {
         'Date of Birth': s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('en-IN') : '',
         Gender: s.gender ?? '',
         Program: adm?.program?.name ?? '',
-        Batch: adm?.batch?.timeSlot ?? '',
+        Batch: normalizeTimeSlot(adm?.batch?.timeSlot),
         'Academic Year': adm?.academicYear?.label ?? '',
         Status: adm?.status ?? '',
         'Father Name': s.parent?.fatherName ?? '',
@@ -241,7 +242,7 @@ export class DownloadService {
       UIN: r.student.uin,
       'Student Name': `${r.student.firstName} ${r.student.lastName}`,
       Program: '',
-      Batch: r.batch?.timeSlot ?? '',
+      Batch: normalizeTimeSlot(r.batch?.timeSlot),
       Status: r.status,
       Remarks: r.remarks ?? '',
     }));
@@ -431,7 +432,7 @@ export class DownloadService {
       UIN: r.admission.student.uin,
       'Student Name': `${r.admission.student.firstName} ${r.admission.student.lastName}`,
       Program: r.admission.program.name,
-      Batch: r.admission.batch?.timeSlot ?? '',
+      Batch: normalizeTimeSlot(r.admission.batch?.timeSlot),
       Status: r.admission.status ?? '',
     }));
   }
@@ -474,7 +475,7 @@ export class DownloadService {
       UIN: r.student.uin,
       'Student Name': `${r.student.firstName} ${r.student.lastName}`,
       Program: r.program.name,
-      Batch: r.batch?.timeSlot ?? '',
+      Batch: normalizeTimeSlot(r.batch?.timeSlot),
       'Father Mobile': r.student.parent?.fatherMobile ?? '',
       'Quit Reason': (r as any).quitReason ?? '',
     }));

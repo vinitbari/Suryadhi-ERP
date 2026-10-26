@@ -86,21 +86,15 @@ export default function SOASummaryPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [month, setMonth] = useState('');
+  const [school, setSchool] = useState<any>(null);
 
   const fetchSOA = async () => {
     setIsLoading(true);
     try {
       const res = await api.get('/soa/summary', { params: { month: month || undefined } });
       if (res.data.success) {
-        const stmt = res.data.data.feeRoyaltyStatement || {};
-        setStats({
-          receivable: stmt.feesReceivable || 1250000,
-          collection: stmt.feesCollected || 890000,
-          paymentDue: stmt.feesDue || 360000,
-          fcrDeposited: stmt.fcrDeposited || 720000,
-          fcrPending: stmt.fcrPending || 170000,
-          creditNotes: stmt.creditNotes || 25000,
-        });
+        setStats(res.data.data.feeRoyaltyStatement);
+        if (res.data.data.school) setSchool(res.data.data.school);
         
         const apiData = res.data.data.soaEntries.map((item: any) => ({
           id: item.id,

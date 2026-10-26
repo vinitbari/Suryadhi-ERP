@@ -429,8 +429,13 @@ export default function UpdateAdmissionPage() {
                 <Select value={form.batchId} onValueChange={(v) => setField('batchId', v)}>
                   <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white"><SelectValue placeholder="Select Batch" /></SelectTrigger>
                   <SelectContent>
-                    {batches.map((b: any) => (
-                      <SelectItem key={b.id} value={b.id}>{b.timeSlot}</SelectItem>
+                    {(batches.length > 0 ? batches : [
+                      { id: 'morning', timeSlot: 'Morning Shift' },
+                      { id: 'evening', timeSlot: 'Evening Shift' }
+                    ]).map((b: any) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.timeSlot}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

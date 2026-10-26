@@ -170,7 +170,7 @@ export default function ConvertToAdmissionPage() {
         dateOfBirth: form.dateOfBirth,
         nationality: form.nationality,
         programId: form.programId,
-        batchId: form.batchId || undefined,
+        batchId: (form.batchId && !form.batchId.startsWith('batch-') && !['early', 'late', 'morning', 'evening'].includes(form.batchId)) ? form.batchId : undefined,
         admissionType: form.admissionType,
         isUniformRequired: form.isUniformRequired === 'yes',
         isDiscountApplicable: form.isDiscountApplicable === 'yes',
@@ -445,7 +445,14 @@ export default function ConvertToAdmissionPage() {
                 <Select value={form.batchId} onValueChange={v => setField('batchId', v)}>
                   <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white"><SelectValue placeholder="Select Batch" /></SelectTrigger>
                   <SelectContent>
-                    {batches.map(b => <SelectItem key={b.id} value={b.id}>{b.timeSlot}</SelectItem>)}
+                    {(batches.length > 0 ? batches : [
+                      { id: 'morning', timeSlot: 'Morning Shift' },
+                      { id: 'evening', timeSlot: 'Evening Shift' }
+                    ]).map(b => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.timeSlot}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

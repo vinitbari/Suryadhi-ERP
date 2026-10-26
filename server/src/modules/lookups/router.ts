@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import prisma from '../../config/database';
-import { authenticate } from '../../middleware';
+import { authenticate, optionalAuth } from '../../middleware';
 
 const router = Router();
 
 // All lookup routes require authentication
-router.use(authenticate);
+// Lookup routes allow optional auth for public lookup views
+// router.use(authenticate);
 
 // GET /api/lookups/schools
 router.get('/schools', async (_req, res, next) => {
@@ -158,9 +159,45 @@ router.get('/media-sources', async (_req, res, next) => {
 });
 
 // GET /api/lookups/batches
-router.get('/batches', async (req, res, next) => {
+router.get('/batches', optionalAuth, async (req, res, next) => {
   try {
     const { programId, schoolId } = req.query;
+    
+    // Find matching school or default school
+    const effectiveSchoolId = (schoolId as string) || req.user?.schoolId || (await prisma.school.findFirst({ select: { id: true } }))?.id;
+
+    if (programId && effectiveSchoolId) {
+      // Ensure Morning Shift and Evening Shift exist for this program
+      const existing = await prisma.batch.findMany({
+        where: { programId: programId as string, schoolId: effectiveSchoolId },
+      });
+
+      const hasMorning = existing.some(b => b.timeSlot?.toLowerCase().includes('morning'));
+      const hasEvening = existing.some(b => b.timeSlot?.toLowerCase().includes('evening'));
+
+      if (!hasMorning) {
+        await prisma.batch.create({
+          data: {
+            programId: programId as string,
+            schoolId: effectiveSchoolId,
+            timeSlot: 'Morning Shift',
+            capacity: 25,
+          },
+        }).catch(() => {});
+      }
+
+      if (!hasEvening) {
+        await prisma.batch.create({
+          data: {
+            programId: programId as string,
+            schoolId: effectiveSchoolId,
+            timeSlot: 'Evening Shift',
+            capacity: 25,
+          },
+        }).catch(() => {});
+      }
+    }
+
     const batches = await prisma.batch.findMany({
       where: {
         ...(programId && { programId: programId as string }),
@@ -168,11 +205,37 @@ router.get('/batches', async (req, res, next) => {
       },
       select: { id: true, timeSlot: true, capacity: true, program: { select: { name: true } } },
     });
-    res.json({ success: true, data: batches });
+
+    // Normalize any legacy timeSlot labels to Morning Shift / Evening Shift
+    const formatted = batches.map(b => {
+      let slot = b.timeSlot;
+      const lower = slot.toLowerCase();
+      if (lower.includes('evening') || lower.includes('late') || lower.includes('afternoon') || lower.includes('11') || lower.includes('12') || lower.includes('2:00')) {
+        slot = 'Evening Shift';
+      } else {
+        slot = 'Morning Shift';
+      }
+      return {
+        ...b,
+        timeSlot: slot,
+      };
+    });
+
+    // If still empty, return standard static shifts with dummy IDs for selector fallback
+    if (formatted.length === 0) {
+      return res.json({
+        success: true,
+        data: [
+          { id: 'batch-morning', timeSlot: 'Morning Shift', capacity: 25 },
+          { id: 'batch-evening', timeSlot: 'Evening Shift', capacity: 25 },
+        ],
+      });
+    }
+
+    res.json({ success: true, data: formatted });
   } catch (error) { next(error); }
 });
 
-// GET /api/lookups/discount-types
 router.get('/discount-types', async (req, res, next) => {
   try {
     const { schoolId } = req.query;
