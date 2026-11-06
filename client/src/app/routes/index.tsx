@@ -136,6 +136,8 @@ export default function AppRoutes() {
           <Route path={PATHS.ADMISSION.EDIT()} element={<UpdateAdmissionPage />} />
           <Route path={PATHS.ADMISSION.RECEIPT()} element={<AdvanceReceiptFormPage />} />
           <Route path={PATHS.ADMISSION.VIEW_RECEIPT} element={<PrintReceiptPage />} />
+          <Route path="/graduation" element={<NameChangeConfirmationPage />} />
+          <Route path={PATHS.GRADUATION.ROOT} element={<NameChangeConfirmationPage />} />
           <Route path={PATHS.GRADUATION.HOMEBUDDY} element={<GraduationHomebuddyPage />} />
           <Route path={PATHS.TRANSFERS.IN} element={<TransferInPage />} />
           <Route path={PATHS.TRANSFERS.MANAGE} element={<TransferInPage />} />
@@ -208,6 +210,9 @@ export default function AppRoutes() {
 
           {/* Tools */}
           <Route path={PATHS.TOOLS.FEE_CALCULATOR} element={<FeeCalculatorPage />} />
+          <Route path="/tools/fee-calculator" element={<FeeCalculatorPage />} />
+          <Route path="/fees/calculator" element={<FeeCalculatorPage />} />
+          <Route path="/fees/fee-calculator" element={<FeeCalculatorPage />} />
 
           {/* Settings / Admin */}
           <Route path={PATHS.SETTINGS.SYSTEM} element={<SystemSettingsPage />} />
