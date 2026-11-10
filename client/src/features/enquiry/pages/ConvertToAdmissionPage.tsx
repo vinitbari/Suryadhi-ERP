@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import api from '@/api/client';
@@ -25,6 +25,23 @@ export default function ConvertToAdmissionPage() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
+
+  // Standardize batches system-wide to strictly 2 non-duplicate batches: Morning Shift (1st) & Late Morning Shift (2nd)
+  const cleanBatches = useMemo(() => {
+    const morning = batches.find(b => {
+      const s = (b.timeSlot || '').toLowerCase();
+      return !s.includes('late') && !s.includes('evening') && !s.includes('afternoon');
+    });
+    const late = batches.find(b => {
+      const s = (b.timeSlot || '').toLowerCase();
+      return s.includes('late') || s.includes('evening') || s.includes('afternoon');
+    });
+
+    return [
+      { id: morning?.id || 'batch-morning', timeSlot: 'Morning Shift' },
+      { id: late?.id || 'batch-late-morning', timeSlot: 'Late Morning Shift' },
+    ];
+  }, [batches]);
   
   const [enquirerMap, setEnquirerMap] = useState('fathers');
 
@@ -440,14 +457,20 @@ export default function ConvertToAdmissionPage() {
 
               <div className="grid grid-cols-[180px_1fr] items-center gap-4">
                 <Label className="text-right text-slate-600 font-normal text-[13px]">Batch <span className="text-red-500">*</span></Label>
-                <Select value={form.batchId} onValueChange={v => setField('batchId', v)}>
-                  <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white"><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                <Select
+                  value={
+                    form.batchId === cleanBatches[1]?.id || (batches.find(b => b.id === form.batchId)?.timeSlot || '').toLowerCase().includes('late') || (batches.find(b => b.id === form.batchId)?.timeSlot || '').toLowerCase().includes('evening')
+                      ? cleanBatches[1]?.id
+                      : cleanBatches[0]?.id
+                  }
+                  onValueChange={v => setField('batchId', v)}
+                >
+                  <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white">
+                    <SelectValue placeholder="Select Batch" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(batches.length > 0 ? batches : [
-                      { id: 'morning', timeSlot: 'Morning Shift' },
-                      { id: 'evening', timeSlot: 'Evening Shift' }
-                    ]).map(b => (
-                      <SelectItem key={b.id} value={b.id}>
+                    {cleanBatches.map((b: any) => (
+                      <SelectItem key={b.id} value={b.id} className="text-[13px]">
                         {b.timeSlot}
                       </SelectItem>
                     ))}

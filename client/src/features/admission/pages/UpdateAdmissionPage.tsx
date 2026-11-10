@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,23 @@ export default function UpdateAdmissionPage() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
+
+  // Standardize batches system-wide to strictly 2 non-duplicate batches: Morning Shift (1st) & Late Morning Shift (2nd)
+  const cleanBatches = useMemo(() => {
+    const morning = batches.find(b => {
+      const s = (b.timeSlot || '').toLowerCase();
+      return !s.includes('late') && !s.includes('evening') && !s.includes('afternoon');
+    });
+    const late = batches.find(b => {
+      const s = (b.timeSlot || '').toLowerCase();
+      return s.includes('late') || s.includes('evening') || s.includes('afternoon');
+    });
+
+    return [
+      { id: morning?.id || 'batch-morning', timeSlot: 'Morning Shift' },
+      { id: late?.id || 'batch-late-morning', timeSlot: 'Late Morning Shift' },
+    ];
+  }, [batches]);
 
   const [form, setForm] = useState<FormState>({
     academicYearId: '',
@@ -422,14 +439,20 @@ export default function UpdateAdmissionPage() {
 
               <div className="grid grid-cols-[180px_1fr] items-center gap-4">
                 <Label className="text-right text-slate-600 font-normal text-[13px]">Batch <span className="text-red-500">*</span></Label>
-                <Select value={form.batchId} onValueChange={(v) => setField('batchId', v)}>
-                  <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white"><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                <Select
+                  value={
+                    form.batchId === cleanBatches[1]?.id || (batches.find(b => b.id === form.batchId)?.timeSlot || '').toLowerCase().includes('late') || (batches.find(b => b.id === form.batchId)?.timeSlot || '').toLowerCase().includes('evening')
+                      ? cleanBatches[1]?.id
+                      : cleanBatches[0]?.id
+                  }
+                  onValueChange={(v) => setField('batchId', v)}
+                >
+                  <SelectTrigger className="h-8 text-[13px] border-slate-300 shadow-none rounded-sm bg-white">
+                    <SelectValue placeholder="Select Batch" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(batches.length > 0 ? batches : [
-                      { id: 'morning', timeSlot: 'Morning Shift' },
-                      { id: 'evening', timeSlot: 'Evening Shift' }
-                    ]).map((b: any) => (
-                      <SelectItem key={b.id} value={b.id}>
+                    {cleanBatches.map((b: any) => (
+                      <SelectItem key={b.id} value={b.id} className="text-[13px]">
                         {b.timeSlot}
                       </SelectItem>
                     ))}
@@ -454,7 +477,7 @@ export default function UpdateAdmissionPage() {
               <div className="hidden md:block"></div>
 
               <div className="grid grid-cols-[180px_1fr] items-center gap-4">
-                <Label className="text-right text-slate-600 font-normal text-[13px] leading-tight">Has any of the child's kin attended SUNOIA / SEMS before?</Label>
+                <Label className="text-right text-slate-600 font-normal text-[13px] leading-tight">Has any of the child's kin attended SunoiaKids before?</Label>
                 <RadioGroup value={form.isKinAttended} onValueChange={(v) => setField('isKinAttended', v)} className="flex gap-4 items-center h-8">
                   <div className="flex items-center space-x-1.5"><RadioGroupItem value="yes" id="kin-yes" /><Label htmlFor="kin-yes" className="font-normal text-[13px]">Yes</Label></div>
                   <div className="flex items-center space-x-1.5"><RadioGroupItem value="no" id="kin-no" /><Label htmlFor="kin-no" className="font-normal text-[13px]">No</Label></div>
