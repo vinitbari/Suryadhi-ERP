@@ -666,7 +666,7 @@ function _unusedPrint(r: ReceiptRow, data: AdmissionData) {
       <ol>
         <li>All payments shall be made strictly by a/c payee local cheque or demand draft only. NO CASH PAYMENTS SHALL BE ACCEPTED.</li>
         <li>All fee once paid shall not be refunded under any circumstances.</li>
-        <li>Fees and other amount shall be paid in accordance with the fee structure issued and authorized by Suryadhi. (The copy of which is available at the Sunoia Kids Pre-School).</li>
+        <li>Fees and other amount shall be paid in accordance with the fee structure issued and authorized by Suryadhi (The copy of which is available at the Suryadhi Preschool).</li>
         <li>Please ensure that you keep the fee receipts safely so that the same can be produced as and when required.</li>
         <li>In case of cheque dishonour, penalty of Rs.500/- shall be charged.</li>
       </ol>
@@ -923,7 +923,7 @@ function _unusedOldModal(receipt: any, data: any, onClose: any, onPrint: any, on
               <ol className="list-decimal pl-4 space-y-1">
                 <li>All payments shall be made strictly by a/c payee local cheque or demand draft only NO CASH PAYMENTS SHALL BE ACCEPTED.</li>
                 <li>All fee once paid shall not be refunded under any circumstances.</li>
-                <li>Fees and other amount shall be paid in accordance with the fee structure issued and authorized by Sunoia Kids Pre-School. (The copy of which is available at the Sunoia Kids Pre-School).</li>
+                <li>Fees and other amount shall be paid in accordance with the fee structure issued and authorized by Suryadhi (The copy of which is available at the Suryadhi Preschool).</li>
                 <li>Please ensure that you keep the fee receipts safely so that the same can be produced as and when required.</li>
                 <li>In case of cheque dishonour, penalty of Rs.500/- shall be charged.</li>
               </ol>
