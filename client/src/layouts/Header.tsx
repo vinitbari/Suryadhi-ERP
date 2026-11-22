@@ -81,13 +81,23 @@ export default function Header() {
     : (user?.role?.replace(/_/g, ' ') || 'Admin');
 
   return (
-    <header className="h-14 border-b border-[#2d3139] bg-[#1c1f26] text-white sticky top-0 z-50 flex items-center justify-between px-3 md:px-4 gap-3 select-none shadow-md">
-      {/* Left: Mobile Toggle + SUNOIAKIDS Logo Badge + System Title */}
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="h-14 shrink-0 border-b border-[#282c35] bg-[#1a1d24] text-white z-50 flex items-center justify-between px-3 md:px-4 gap-3 select-none shadow-md">
+      {/* Left: Sidebar Toggles + SUNOIAKIDS Logo Badge + System Title */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        {/* Mobile Toggle */}
         <button
           onClick={() => { toggleSidebar(); setSidebarMobileOpen(true); }}
           className="lg:hidden p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors shrink-0"
           title="Toggle Navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Desktop Sidebar Toggle */}
+        <button
+          onClick={toggleSidebar}
+          className="hidden lg:flex p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors shrink-0"
+          title="Toggle Sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -117,27 +127,24 @@ export default function Header() {
       {/* Right Controls */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Search */}
-        <div className="hidden xl:flex items-center gap-2 bg-[#2a2e37] rounded-md px-3 py-1.5 w-52 border border-white/10 text-slate-200 focus-within:border-amber-400/50 transition-colors">
+        <div className="hidden 2xl:flex items-center gap-2 bg-[#222630] rounded-md px-3 py-1.5 w-48 border border-[#323846] text-slate-200 focus-within:border-amber-400/50 transition-colors">
           <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
-            placeholder="Search students, enquiries..."
+            placeholder="Search..."
             className="bg-transparent text-xs text-white outline-none w-full placeholder:text-slate-400"
           />
-          <kbd className="hidden 2xl:flex h-4 items-center gap-0.5 rounded border border-white/10 bg-white/5 px-1 text-[9px] font-medium text-slate-400">
-            ⌘K
-          </kbd>
         </div>
 
         {/* Franchise Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#2a2e37] text-amber-300 text-xs font-semibold border border-amber-500/30 shadow-xs">
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#222630] text-amber-300 text-xs font-semibold border border-amber-500/30 shadow-xs">
           <Building2 className="h-3.5 w-3.5 text-amber-400 shrink-0" />
           <span>Franchisee: <strong className="text-white font-bold">{BRAND.franchiseCode}</strong></span>
         </div>
 
         {/* Academic Year Display (Locked - Selected at Login) */}
         <div
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#2a2e37] text-emerald-300 text-xs font-semibold border border-emerald-500/30 shadow-xs"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#222630] text-emerald-300 text-xs font-semibold border border-emerald-500/30 shadow-xs"
           title="Academic Year locked from login session"
         >
           <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
@@ -156,7 +163,7 @@ export default function Header() {
         {/* Notifications */}
         <button className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors relative">
           <Bell className="h-4 w-4" />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[#1c1f26]" />
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[#1a1d24]" />
         </button>
 
         {/* Profile */}

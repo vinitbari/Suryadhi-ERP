@@ -168,9 +168,9 @@ function SidebarGroup({ item }: { item: SidebarItem }) {
         to={item.href}
         className={({ isActive }) =>
           cn(
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200',
-            'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60',
-            isActive && 'bg-primary/15 text-primary font-semibold',
+            'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-all duration-150',
+            'text-[#abb2bf] hover:text-white hover:bg-[#252932]',
+            isActive && 'bg-[#252932] text-[#e5c07b] font-semibold border-l-2 border-[#e5c07b]',
             sidebarCollapsed && 'justify-center px-2'
           )
         }
@@ -180,7 +180,7 @@ function SidebarGroup({ item }: { item: SidebarItem }) {
           <>
             <span className="truncate">{item.label}</span>
             {item.badge && (
-              <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-md">
+              <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-[#ea580c] text-white rounded">
                 {item.badge}
               </span>
             )}
@@ -196,20 +196,20 @@ function SidebarGroup({ item }: { item: SidebarItem }) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium w-full transition-all duration-200',
-          'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60',
-          isChildActive && 'text-primary',
+          'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium w-full transition-all duration-150 text-left',
+          'text-[#abb2bf] hover:text-white hover:bg-[#252932]',
+          isChildActive && 'text-[#e5c07b] font-semibold',
           sidebarCollapsed && 'justify-center px-2'
         )}
       >
         <item.icon className="h-[18px] w-[18px] shrink-0" />
         {!sidebarCollapsed && (
           <>
-            <span className="truncate text-left flex-1">{item.label}</span>
+            <span className="truncate flex-1">{item.label}</span>
             <ChevronDown
               className={cn(
-                'h-3.5 w-3.5 shrink-0 transition-transform duration-200',
-                isOpen && 'rotate-180'
+                'h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-slate-400',
+                isOpen && 'rotate-180 text-white'
               )}
             />
           </>
@@ -217,26 +217,22 @@ function SidebarGroup({ item }: { item: SidebarItem }) {
       </button>
 
       {isOpen && !sidebarCollapsed && (
-        <div
-          className="overflow-hidden"
-        >
-          <div className="ml-5 pl-3 border-l border-sidebar-border/60 mt-1 space-y-0.5 pb-1">
-            {item.children?.map((child) => (
-              <NavLink
-                key={child.href}
-                to={child.href}
-                className={({ isActive }) =>
-                  cn(
-                    'block px-3 py-1.5 rounded-md text-[12.5px] transition-all duration-150',
-                    'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
-                    isActive && 'text-primary bg-primary/10 font-medium'
-                  )
-                }
-              >
-                {child.label}
-              </NavLink>
-            ))}
-          </div>
+        <div className="ml-4 pl-2 border-l border-[#2e3340] space-y-0.5 mt-1 pb-1">
+          {item.children?.map((child) => (
+            <NavLink
+              key={child.href}
+              to={child.href}
+              className={({ isActive }) =>
+                cn(
+                  'block px-2.5 py-1.5 rounded text-[12px] transition-all duration-150',
+                  'text-[#8a92a0] hover:text-white hover:bg-[#252932]/70',
+                  isActive && 'text-[#e5c07b] bg-[#282d38] font-medium'
+                )
+              }
+            >
+              {child.label}
+            </NavLink>
+          ))}
         </div>
       )}
     </div>
@@ -255,17 +251,17 @@ export default function Sidebar() {
     <>
       {/* Sidebar Top Controls / Quick Collapse */}
       <div className={cn(
-        'h-10 flex items-center border-b border-sidebar-border/40 px-3 shrink-0 text-sidebar-foreground/50 transition-all',
+        'h-10 flex items-center border-b border-[#282c35] bg-[#16181f]/70 px-3 shrink-0 text-slate-400 transition-all',
         sidebarCollapsed ? 'justify-center' : 'justify-between'
       )}>
         {!sidebarCollapsed && (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Navigation Menu
           </span>
         )}
         <button
           onClick={toggleSidebar}
-          className="p-1 rounded hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+          className="p-1 rounded hover:bg-[#252932] text-slate-400 hover:text-white transition-colors"
           title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
           {sidebarCollapsed ? (
@@ -277,7 +273,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto py-2.5 px-2 space-y-0.5 custom-scrollbar">
         {navigation.map((item) => (
           <SidebarGroup key={item.label} item={item} />
         ))}
@@ -285,11 +281,11 @@ export default function Sidebar() {
 
       {/* Footer */}
       {!sidebarCollapsed && (
-        <div className="border-t border-sidebar-border/40 px-4 py-3 shrink-0">
-          <p className="text-[9px] text-sidebar-foreground/30">
+        <div className="border-t border-[#282c35] bg-[#16181f]/70 px-4 py-2.5 shrink-0">
+          <p className="text-[10px] text-slate-400 font-medium">
             {BRAND.poweredBy}
           </p>
-          <p className="text-[9px] text-sidebar-foreground/25 mt-0.5">
+          <p className="text-[9px] text-slate-500 mt-0.5">
             {BRAND.copyright}
           </p>
         </div>
@@ -302,9 +298,9 @@ export default function Sidebar() {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          'fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] bg-sidebar flex-col hidden lg:flex',
-          'transition-all duration-300 ease-in-out border-r border-sidebar-border/50',
-          sidebarCollapsed ? 'w-16' : 'w-[260px]'
+          'shrink-0 h-full bg-[#1a1d24] text-[#abb2bf] flex-col hidden lg:flex',
+          'transition-all duration-200 ease-in-out border-r border-[#282c35] select-none',
+          sidebarCollapsed ? 'w-16' : 'w-[250px]'
         )}
       >
         {sidebarContent}
@@ -314,15 +310,15 @@ export default function Sidebar() {
       {sidebarMobileOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-50 bg-black/60 lg:hidden backdrop-blur-xs"
             onClick={() => setSidebarMobileOpen(false)}
           />
           <aside
-            className="fixed top-0 left-0 z-50 h-screen w-[260px] bg-sidebar flex flex-col lg:hidden"
+            className="fixed top-0 left-0 z-50 h-screen w-[260px] bg-[#1a1d24] text-[#abb2bf] flex flex-col lg:hidden border-r border-[#282c35] shadow-2xl"
           >
             <button
               onClick={() => setSidebarMobileOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground"
+              className="absolute top-2.5 right-2.5 p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 z-10"
             >
               <X className="h-5 w-5" />
             </button>
